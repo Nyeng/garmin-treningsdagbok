@@ -54,6 +54,19 @@ function weekKey(dateStr) {
     return `${t.getUTCFullYear()}-U${String(week).padStart(2, '0')}`;
 }
 
+// Periodene i range-picker'en over grafene. `days: 0` betyr "alt". Delt
+// mellom Node (tegner knappene) og klientskriptet (filtrerer punktene) —
+// selve tallene lever bare her.
+const RANGES = [
+    { days: 7, label: '7 dager' },
+    { days: 30, label: '30 dager' },
+    { days: 90, label: '3 måneder' },
+    { days: 182, label: '6 måneder' },
+    { days: 365, label: '1 år' },
+    { days: 0, label: 'Alt' }
+];
+const DEFAULT_RANGE_DAYS = 90;
+
 // --- datapreparering --------------------------------------------------------
 
 const days = summary.days;
@@ -72,9 +85,18 @@ for (const d of days) {
         w.time += r.time_s ?? 0;
     }
 }
-// sammenhengende akse: alle 16 siste uker, også uker uten løp (0 km)
-const weekKeys = Array.from({ length: 16 }, (_, i) =>
-    weekKey(new Date(Date.now() - (15 - i) * 7 * 86_400_000).toISOString().slice(0, 10)));
+// sammenhengende akse: hver ISO-uke fra første dag i datasettet til i dag,
+// også uker uten løp (0 km). Full historikk i stedet for en fast 16-ukers
+// grense, så "1 år"/"Alt" i range-picker'en har noe å vise — klientfilteret
+// avgjør hvor mye av dette som faktisk tegnes.
+const weekOrder = [];
+const weekDateOf = new Map();
+const firstDay = days[0]?.date ?? today;
+for (let d = new Date(`${firstDay}T12:00:00`); d <= new Date(`${today}T12:00:00`); d.setDate(d.getDate() + 1)) {
+    const iso = d.toISOString().slice(0, 10);
+    const k = weekKey(iso);
+    if (!weekDateOf.has(k)) { weekDateOf.set(k, iso); weekOrder.push(k); }
+}
 
 // Hvilke ISO-uker en sykdomsperiode overlapper, så volumfallet får en synlig
 // forklaring i grafen i stedet for å se ut som et uforklart dropp i formen.
@@ -85,27 +107,28 @@ for (const period of markers.illness ?? []) {
     }
 }
 
-const weekly = weekKeys.map((k) => {
+const weekly = weekOrder.map((k) => {
     const w = byWeek.get(k) ?? { km: 0, n: 0, time: 0 };
     const sick = sickWeekKeys.has(k);
     return {
-        label: k.slice(5), value: w.km, sick,
+        date: weekDateOf.get(k), label: k.slice(5), value: w.km, sick,
         tip: `${k} · ${w.km.toFixed(1)} km · ${w.n} økter · ${fmtDur(w.time)}${sick ? ' · sykdom' : ''}`
     };
 });
 
-const seriesOf = (field, n) =>
-    days.filter((d) => d[field] != null).slice(-n)
-        .map((d) => ({ date: d.date, value: d[field] }));
+// Full historikk her, ikke et fast antall dager — range-picker'en i
+// nettleseren avgjør hvor mye som faktisk vises (se filterableChart).
+const seriesOf = (field) =>
+    days.filter((d) => d[field] != null).map((d) => ({ date: d.date, value: d[field] }));
 
-const rhrSeries = seriesOf('rhr', 60).map((p) => ({ ...p, tip: `${shortDate(p.date)} · hvilepuls ${p.value}` }));
+const rhrSeries = seriesOf('rhr').map((p) => ({ ...p, tip: `${shortDate(p.date)} · hvilepuls ${p.value}` }));
 const sykdomsBands = (markers.illness ?? []).map((m) => ({ from: m.start, to: m.end, label: m.label }));
-const hrvSeries = seriesOf('hrv', 60).map((p) => ({ ...p, tip: `${shortDate(p.date)} · HRV ${p.value} ms` }));
-const sleepSeries = seriesOf('sleep_h', 30).map((p) => {
+const hrvSeries = seriesOf('hrv').map((p) => ({ ...p, tip: `${shortDate(p.date)} · HRV ${p.value} ms` }));
+const sleepSeries = seriesOf('sleep_h').map((p) => {
     const score = days.find((d) => d.date === p.date)?.sleep_score;
-    return { label: shortDate(p.date), value: p.value, tip: `${shortDate(p.date)} · ${p.value.toFixed(1)} t søvn${score ? ` · score ${score}` : ''}` };
+    return { date: p.date, label: shortDate(p.date), value: p.value, tip: `${shortDate(p.date)} · ${p.value.toFixed(1)} t søvn${score ? ` · score ${score}` : ''}` };
 });
-const readinessSeries = seriesOf('readiness', 30).map((p) => ({ ...p, tip: `${shortDate(p.date)} · klarhet ${p.value}` }));
+const readinessSeries = seriesOf('readiness').map((p) => ({ ...p, tip: `${shortDate(p.date)} · klarhet ${p.value}` }));
 
 // formhistorikk (data/history.json) — punktene kommer når Garmin oppdaterer
 // dem, ikke hver dag, så disse to tegnes på tidsakse
@@ -143,15 +166,16 @@ function målFor(km) {
 function prediksjonsGraf(nøkkel) {
     const d = DISTANSER[nøkkel];
     const mål = målFor(d.km);
-    const data = history.filter((h) => h[d.felt]).map((h) => ({
+    const points = history.filter((h) => h[d.felt]).map((h) => ({
         date: h.date,
         value: h[d.felt],
         tip: `${shortDate(h.date)} · ${d.navn} ${fmtRaceTime(h[d.felt])}`
             + ` · ${fmtPace(h[d.felt] / d.km)}/km`
     }));
-    return lineChart({
+    return filterableChart({
+        id: `chart-pred-${nøkkel}`, kind: 'line',
         title: `Garmins ${d.tittel} over tid (raskere er høyere)`,
-        data, fmt: fmtRaceTime, tickFmt: fmtHm, tickSteps: d.tickSteps, timeAxis: true, invert: true,
+        points, fmtKey: 'racetime', tickFmtKey: 'hm', tickSteps: d.tickSteps, timeAxis: true, invert: true,
         goal: mål?.goal_seconds ?? null,
         goalLabel: mål ? `mål ${fmtRaceTime(mål.goal_seconds)}` : ''
     });
@@ -204,10 +228,9 @@ function barChart({ title, data, unit = '' }) {
     }).join('');
     const last = data[data.length - 1];
     const label = `<text x="${PAD.l + (data.length - 0.5) * slot}" y="${yOf(last.value) - 6}" class="direct" text-anchor="middle">${last.value.toFixed(1)}${unit}</text>`;
-    return svgCard(title,
-        gridAndAxis(niceTicks(0, max), yOf) +
+    return gridAndAxis(niceTicks(0, max), yOf) +
         `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${H - PAD.b}" y2="${H - PAD.b}" class="axis"/>` +
-        bars + label + xLabels(data, (d) => d.label, (i) => PAD.l + (i + 0.5) * slot));
+        bars + label + xLabels(data, (d) => d.label, (i) => PAD.l + (i + 0.5) * slot);
 }
 
 // linjediagram: 2px linje, markør + direkte verdi på siste punkt, usynlige hover-flater
@@ -261,19 +284,31 @@ function lineChart({ title, data, fmt = (v) => v, tickFmt = null, tickSteps = nu
     const goalLine = goal == null ? '' :
         `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${yOf(goal)}" y2="${yOf(goal)}" class="goal"/>` +
         `<text x="${W - PAD.r}" y="${yOf(goal) + (invert ? 12 : -5)}" class="goal-label" text-anchor="end">${esc(goalLabel)}</text>`;
-    return svgCard(title,
-        bandRects +
+    return bandRects +
         gridAndAxis(niceTicks(min, max, 4, tickSteps), yOf, tickFmt ?? fmt) + goalLine +
         `<path d="${path}" class="line"/>` + endMark + hits +
         `<circle class="hover-dot" r="4" style="display:none"/>` +
-        xLabels(data, labelOf, xOf));
+        xLabels(data, labelOf, xOf);
 }
 
-function svgCard(title, inner) {
+// `id` er valgfri — satt på filtrerbare grafer, som klientskriptet fyller inn
+// og skriver om ved bytte av tidsperiode (se range-picker-scriptet nederst).
+function svgCard(title, inner, id = null) {
     return `<figure class="card">
   <figcaption>${esc(title)}</figcaption>
-  <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">${inner}</svg>
+  <svg${id ? ` id="${id}"` : ''} viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">${inner}</svg>
 </figure>`;
+}
+
+// Grafer som skal kunne filtreres på tidsperiode i nettleseren (range-picker
+// nederst i HTML-en) registreres her med FULL, ufiltrert punktserie. Node
+// tegner bare det tomme skjelettet — samme lineChart/barChart-funksjoner
+// kjøres på nytt klientsidig (via .toString()) når brukeren bytter periode,
+// så det finnes bare ÉN implementasjon av selve tegnelogikken.
+const chartRegistry = [];
+function filterableChart(entry) {
+    chartRegistry.push(entry);
+    return svgCard(entry.title, '', entry.id);
 }
 
 // --- fliser (hero-tall) -----------------------------------------------------
@@ -332,13 +367,13 @@ const readinessTile = latestReadiness ? `<div class="tile">
 const alleLøp = days.flatMap((d) => (d.runs ?? []).map((r) => ({ ...r, date: d.date })));
 
 const HR_SONER = [
-    { navn: 'rolig (puls < 155)', test: (hr) => hr < 155 },
-    { navn: 'moderat (puls 155–171)', test: (hr) => hr >= 155 && hr < 172 },
-    { navn: 'hardt/terskel (puls ≥ 172)', test: (hr) => hr >= 172 }
+    { key: 'rolig', navn: 'rolig (puls < 155)', test: (hr) => hr < 155 },
+    { key: 'moderat', navn: 'moderat (puls 155–171)', test: (hr) => hr >= 155 && hr < 172 },
+    { key: 'hardt', navn: 'hardt/terskel (puls ≥ 172)', test: (hr) => hr >= 172 }
 ];
 
 function pacePerSoneGraf(sone) {
-    const data = alleLøp
+    const points = alleLøp
         .filter((r) => r.hr != null && sone.test(r.hr) && (r.gap_s ?? r.pace_s))
         .map((r) => {
             const val = r.gap_s ?? r.pace_s;
@@ -348,9 +383,10 @@ function pacePerSoneGraf(sone) {
                 tip: `${shortDate(r.date)} · ${fmtPace(val)}/km${r.gap_s ? ' (stigningsjustert)' : ''} · puls ${r.hr}${r.elev_m ? ` · ${r.elev_m} hm` : ''}`
             };
         });
-    return lineChart({
+    return filterableChart({
+        id: `chart-pace-${sone.key}`, kind: 'line',
         title: `Fart, ${sone.navn}, stigningsjustert (min/km — raskere er høyere)`,
-        data, fmt: fmtPace, tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
+        points, fmtKey: 'pace', tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
     });
 }
 
@@ -374,9 +410,12 @@ const intervallSplits = intervallSplitsPath && existsSync(intervallSplitsPath)
 const gyldigeLapper = (intervallSplits?.lapDTOs ?? []).filter((l) =>
     l.averageHR != null && l.duration >= 30 && l.averageSpeed <= l.maxSpeed + 0.001);
 
+const pulsdriftTittel = sisteIntervall
+    ? `Pulsdrift per drag, siste intervalløkt: ${sisteIntervall.name} (${fullDate(sisteIntervall.date)})`
+    : '';
 const pulsdriftGraf = sisteIntervall && gyldigeLapper.length >= 2
-    ? lineChart({
-        title: `Pulsdrift per drag, siste intervalløkt: ${sisteIntervall.name} (${fullDate(sisteIntervall.date)})`,
+    ? svgCard(pulsdriftTittel, lineChart({
+        title: pulsdriftTittel,
         data: gyldigeLapper.map((l, i) => ({
             value: l.averageHR,
             label: String(i + 1),
@@ -384,7 +423,7 @@ const pulsdriftGraf = sisteIntervall && gyldigeLapper.length >= 2
         })),
         fmt: (v) => Math.round(v),
         labelOf: (d) => d.label
-    })
+    }))
     : '';
 
 // --- ramp rate: volumendring mot siste FULLFØRTE uke ------------------------
@@ -550,6 +589,11 @@ h1 { font-size: 1.35rem; margin: 0 0 2px; }
 .tile-sub { color: var(--ink-2); font-size: 0.78rem; }
 .behind { color: var(--bad); } .ahead { color: var(--good); }
 h2 { font-size: 1rem; margin: 22px 0 8px; }
+.range-picker { display: flex; gap: 6px; margin: 14px 0 12px; flex-wrap: wrap; }
+.range-picker button { font: inherit; font-size: 0.78rem; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.range-picker button:hover { color: var(--ink); }
+.range-picker button.active { background: var(--series); border-color: var(--series); color: #fff; }
 .plan { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .plan-item { display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border);
   border-radius: 10px; padding: 10px 14px; align-items: baseline; }
@@ -602,20 +646,23 @@ ${rampTile}
 </div>
 ${upcomingHtml ? `<h2>Kommende økter</h2>\n${upcomingHtml}` : ''}
 ${adherenceHtml ? `<h2>Etterlevelse, siste ${ADHERENCE_DAYS} dager</h2>\n${adherenceHtml}` : ''}
+<div class="range-picker" role="group" aria-label="Tidsperiode for grafene">
+${RANGES.map((r) => `<button type="button" data-range="${r.days}">${esc(r.label)}</button>`).join('\n')}
+</div>
 <div class="charts">
-${barChart({ title: 'Ukentlig løpsvolum, siste 16 uker (km)', data: weekly })}
-${lineChart({
-    title: 'Terskelfart over tid (min/km — raskere er høyere)',
-    data: thresholdSeries, fmt: fmtPace, tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
+${filterableChart({ id: 'chart-weekly', kind: 'bar', title: 'Ukentlig løpsvolum (km)', points: weekly })}
+${filterableChart({
+    id: 'chart-threshold', kind: 'line', title: 'Terskelfart over tid (min/km — raskere er høyere)',
+    points: thresholdSeries, fmtKey: 'pace', tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
 })}
 ${PREDIKSJONER.map(prediksjonsGraf).join('\n')}
 ${HR_SONER.map(pacePerSoneGraf).join('\n')}
 ${pulsdriftGraf}
 ${prCard}
-${lineChart({ title: 'HRV natt, siste 60 dager (ms)', data: hrvSeries })}
-${lineChart({ title: 'Hvilepuls, siste 60 dager (slag/min)', data: rhrSeries, bands: sykdomsBands })}
-${barChart({ title: 'Søvn, siste 30 dager (timer)', data: sleepSeries })}
-${lineChart({ title: 'Treningsklarhet, siste 30 dager (0–100)', data: readinessSeries })}
+${filterableChart({ id: 'chart-hrv', kind: 'line', title: 'HRV natt (ms)', points: hrvSeries })}
+${filterableChart({ id: 'chart-rhr', kind: 'line', title: 'Hvilepuls (slag/min)', points: rhrSeries, bands: sykdomsBands })}
+${filterableChart({ id: 'chart-sleep', kind: 'bar', title: 'Søvn (timer)', points: sleepSeries })}
+${filterableChart({ id: 'chart-readiness', kind: 'line', title: 'Treningsklarhet (0–100)', points: readinessSeries })}
 </div>
 <details>
 <summary>Tabell: siste 14 dager</summary>
@@ -629,26 +676,77 @@ ${tableRows}
 </main>
 <div id="tip"></div>
 <script>
+// Tooltip: delegert på document i stedet for bundet per element, fordi
+// range-picker'en under skriver om SVG-innholdet — bundne lyttere ville
+// forsvunnet med de gamle elementene ved hvert periodebytte.
 const tip = document.getElementById('tip');
-document.querySelectorAll('[data-tip]').forEach((el) => {
-  el.addEventListener('mousemove', (e) => {
-    tip.textContent = el.dataset.tip;
-    tip.style.display = 'block';
-    tip.style.left = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8) + 'px';
-    tip.style.top = (e.clientY - 32) + 'px';
-    if (el.classList.contains('hit')) {
-      const dot = el.closest('svg').querySelector('.hover-dot');
-      dot.setAttribute('cx', el.dataset.x);
-      dot.setAttribute('cy', el.dataset.y);
-      dot.style.display = 'block';
-    }
-  });
-  el.addEventListener('mouseleave', () => {
-    tip.style.display = 'none';
+document.addEventListener('mousemove', (e) => {
+  const el = e.target.closest('[data-tip]');
+  if (!el) { tip.style.display = 'none'; return; }
+  tip.textContent = el.dataset.tip;
+  tip.style.display = 'block';
+  tip.style.left = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8) + 'px';
+  tip.style.top = (e.clientY - 32) + 'px';
+  if (el.classList.contains('hit')) {
     const dot = el.closest('svg')?.querySelector('.hover-dot');
-    if (dot) dot.style.display = 'none';
-  });
+    if (dot) { dot.setAttribute('cx', el.dataset.x); dot.setAttribute('cy', el.dataset.y); dot.style.display = 'block'; }
+  }
 });
+document.addEventListener('mouseout', (e) => {
+  if (!e.relatedTarget) tip.style.display = 'none';
+});
+
+// --- range-picker: filtrerer grafene på tidsperiode -------------------------
+// Samme tegnefunksjoner som Node kjører ved bygging (niceTicks/gridAndAxis/
+// xLabels/lineChart/barChart), limt inn her via .toString() ved bygging — så
+// det aldri finnes to implementasjoner av selve tegnelogikken som kan gli fra
+// hverandre. Node tegner bare skjelettet (svgCard med tomt <svg>); denne
+// koden fyller inn innholdet, både ved sidelast og ved periodebytte.
+const W = ${W}, H = ${H}, PAD = ${JSON.stringify(PAD)};
+const plotW = W - PAD.l - PAD.r, plotH = H - PAD.t - PAD.b;
+const esc = ${esc.toString()};
+const shortDate = ${shortDate.toString()};
+const fmtPace = ${fmtPace.toString()};
+const fmtRaceTime = ${fmtRaceTime.toString()};
+const fmtHm = ${fmtHm.toString()};
+${niceTicks.toString()}
+${gridAndAxis.toString()}
+${xLabels.toString()}
+${lineChart.toString()}
+${barChart.toString()}
+
+const FORMATTERS = { plain: (v) => v, pace: fmtPace, racetime: fmtRaceTime, hm: fmtHm };
+const CHART_DATA = ${JSON.stringify(chartRegistry)};
+
+function renderChart(cfg, rangeDays) {
+  const svg = document.getElementById(cfg.id);
+  if (!svg) return;
+  const cutoff = rangeDays > 0 ? new Date(Date.now() - rangeDays * 86400000).toISOString().slice(0, 10) : null;
+  const points = cutoff ? cfg.points.filter((p) => p.date >= cutoff) : cfg.points;
+  const opts = {
+    title: cfg.title, data: points,
+    fmt: FORMATTERS[cfg.fmtKey] || FORMATTERS.plain,
+    tickFmt: cfg.tickFmtKey ? FORMATTERS[cfg.tickFmtKey] : null,
+    tickSteps: cfg.tickSteps || null, timeAxis: !!cfg.timeAxis, invert: !!cfg.invert,
+    goal: cfg.goal ?? null, goalLabel: cfg.goalLabel || '', bands: cfg.bands || []
+  };
+  const inner = cfg.kind === 'bar' ? barChart(opts) : lineChart(opts);
+  svg.innerHTML = inner || '<text x="' + (W / 2) + '" y="' + (H / 2) + '" text-anchor="middle" class="tick">Ikke nok data i valgt periode</text>';
+}
+
+function applyRange(rangeDays) {
+  CHART_DATA.forEach((cfg) => renderChart(cfg, rangeDays));
+  localStorage.setItem('dashboardRange', String(rangeDays));
+  document.querySelectorAll('.range-picker button').forEach((b) => {
+    b.classList.toggle('active', Number(b.dataset.range) === rangeDays);
+  });
+}
+
+document.querySelectorAll('.range-picker button').forEach((b) => {
+  b.addEventListener('click', () => applyRange(Number(b.dataset.range)));
+});
+
+applyRange(Number(localStorage.getItem('dashboardRange') ?? ${DEFAULT_RANGE_DAYS}));
 </script>
 </body>
 </html>
