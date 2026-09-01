@@ -1,0 +1,36 @@
+{
+  "name": "Eksempelplan — bytt ut med din egen",
+  "note": "Kopier denne til $GARMIN_DATA_DIR/plan.json og rediger. Den hører hjemme i det PRIVATE data-repoet: pulssoner er avledet av terskelen din, og hvilke dager du løper sier noe om når du ikke er hjemme. Utgåtte datoer pushes aldri, så husk å oppdatere datoene.",
+  "workouts": [
+    {
+      "date": "2027-01-04",
+      "name": "Rolig 8 km",
+      "rationale": "Fritekst til deg selv — sendes ikke til Garmin.",
+      "steps": [
+        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 6, "hr": { "min": 130, "max": 152 } },
+        { "kind": "cooldown", "minutes": 5 }
+      ]
+    },
+    {
+      "date": "2027-01-06",
+      "name": "Terskel 4 x 6 min",
+      "rationale": "\"repeat\": 4 gir fire runder av draget PLUSS pausen under det.",
+      "steps": [
+        { "kind": "warmup", "minutes": 15, "hr": { "max": 145 } },
+        { "kind": "interval", "minutes": 6, "hr": { "min": 172, "max": 178 }, "repeat": 4 },
+        { "kind": "recovery", "minutes": 2 },
+        { "kind": "cooldown", "minutes": 10 }
+      ]
+    },
+    {
+      "date": "2027-01-09",
+      "name": "Langtur 16 km",
+      "steps": [
+        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 14, "hr": { "min": 130, "max": 155 } },
+        { "kind": "cooldown", "minutes": 5 }
+      ]
+    }
+  ]
+}

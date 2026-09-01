@@ -10,6 +10,9 @@
 //   node push-plan.js --clear       # fjern alle planlagte økter fra planen
 //
 // plan.json:
+// plan.json leses fra $GARMIN_DATA_DIR (det private data-repoet), med fallback
+// til repoet selv. Se kommentaren ved PLAN under.
+//
 //   {
 //     "name": "Retur etter sykdom",      // fritekst, blir ikke sendt til Garmin
 //     "workouts": [
@@ -29,7 +32,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, endpoints } from './lib/garmin.js';
-import { ROOT } from './lib/paths.js';
+import { DATA, ROOT } from './lib/paths.js';
 import { buildFromSpec, isoDateFromName, toDisplayDate } from './lib/workout-spec.js';
 
 const args = process.argv.slice(2);
@@ -37,9 +40,19 @@ const dryRun = args.includes('--dry-run');
 const list = args.includes('--list');
 const clear = args.includes('--clear');
 
-const PLAN = join(ROOT, 'plan.json');
-if (!existsSync(PLAN)) {
-    console.error(`Fant ingen plan.json i ${ROOT}.`);
+// plan.json hører hjemme i det PRIVATE data-repoet: den inneholder pulssoner
+// avledet av terskelen din, hvorfor planen ser ut som den gjør, og hvilke dager
+// du pendler — altså når du forutsigbart ikke er hjemme. Samme vurdering som for
+// threshold-fix.json.
+//
+// Faller tilbake på repoet selv, så malens plan.example.json og et oppsett uten
+// GARMIN_DATA_DIR fortsatt virker.
+const PLAN = [join(DATA, 'plan.json'), join(ROOT, 'plan.json')].find(existsSync);
+if (!PLAN) {
+    console.error('Fant ingen plan.json.');
+    console.error(`  lette i: ${join(DATA, 'plan.json')}`);
+    console.error(`  og i:    ${join(ROOT, 'plan.json')}`);
+    console.error('Kopier plan.example.json til data-mappa og rediger den.');
     process.exit(1);
 }
 const plan = JSON.parse(readFileSync(PLAN, 'utf8'));

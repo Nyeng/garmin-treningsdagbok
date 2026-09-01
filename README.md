@@ -49,7 +49,7 @@ private API-et som Garmin Connect-appen selv bruker, via
 | `sync.js` | henter aktiviteter, splits, søvn, HRV, hvilepuls, vekt, VO2max, prediksjoner → data-repoet |
 | `stats.js` | ukesstatistikk, restitusjon, nedtelling til løp, i terminalen |
 | `push-workout.js` | dagens økt fra `workout.json` → strukturert økt i Garmin Connect |
-| `push-plan.js` | hele planen fra `plan.json` → daterte økter i **treningskalenderen** |
+| `push-plan.js` | hele planen fra `plan.json` (i data-repoet) → daterte økter i **treningskalenderen** |
 | `push-strength.js` | faste styrkeøkter → øktbiblioteket i Garmin |
 | `push-loype.js` | en rute → løype (course) i Garmin |
 | `finn-loype.js` / `finn-bakke.js` | finner flate teststrekk og jevne intervallbakker fra OSM + Kartverket (**Norge**) |
@@ -305,6 +305,19 @@ node push-plan.js --clear      # fjern planens økter fra kalenderen
 Hver økt bruker **nøyaktig samme steg-skjema som `workout.json`** — begge går
 gjennom `lib/workout-spec.js`, så det finnes bare én oversettelse fra data til
 Garmin-økt.
+
+**`plan.json` hører hjemme i det private data-repoet**, ikke her. Den inneholder
+pulssoner avledet av terskelen din, begrunnelser om form og sykdom, og hvilke
+dager du pendler — altså når du forutsigbart ikke er hjemme. Samme vurdering som
+for `threshold-fix.json`. Skriptet leter i `$GARMIN_DATA_DIR` først og faller
+tilbake på repoet, så `plan.example.json` her virker som mal:
+
+```bash
+cp plan.example.json "$GARMIN_DATA_DIR/plan.json"
+```
+
+`.github/workflows/push-plan.yml` i data-repoet pusher planen automatisk når
+`plan.json` endres der.
 
 Endepunktet er `POST workout-service/schedule/<workoutId>` med
 `{"date":"YYYY-MM-DD"}`, verifisert 01.09.2026. Det er ikke offentlig
@@ -647,6 +660,7 @@ data/
   backup/                # sikkerhetskopi av brukerprofilen før hver skriving
   last_sync.txt          # dato for siste synk
   dashboard.html         # statisk dashboard, bygget av build-dashboard.js
+  plan.json              # treningsplanen (se push-plan.js)
   threshold-fix.json     # rettelse av terskelverdier (se fix-threshold.js)
   strength-fix.json      # rettelse av loggede styrkesett (se fix-strength.js)
 ```
@@ -657,6 +671,7 @@ I det offentlige kode-repoet ligger bare koden pluss:
 ```
 config.json              # løpene dine og måltidene
 workout.json             # dagens økt som data
+plan.example.json        # mal for plan.json (som ligger i data-repoet)
 ```
 
 `summary.json` er poenget med hele opplegget: rådataene fra Garmin er store og
