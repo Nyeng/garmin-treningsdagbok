@@ -93,21 +93,45 @@ const thresholdSeries = history.filter((h) => h.threshold_pace_s).map((h) => ({
     value: h.threshold_pace_s,
     tip: `${shortDate(h.date)} · terskel ${fmtPace(h.threshold_pace_s)}/km${h.threshold_hr ? ` @ ${h.threshold_hr} slag/min` : ''}`
 }));
-const halfGoal = (cfg.races ?? []).find((r) => r.distance_km > 20 && r.distance_km < 30);
-const halfSeries = history.filter((h) => h.pred_half_s).map((h) => ({
-    date: h.date,
-    value: h.pred_half_s,
-    tip: `${shortDate(h.date)} · halv ${fmtRaceTime(h.pred_half_s)}`
-        + ` · ${fmtPace(h.pred_half_s / 21.0975)}/km`
-}));
-const marathonGoal = (cfg.races ?? []).find((r) => r.distance_km > 40);
-const marathonSeries = history.filter((h) => h.pred_marathon_s).map((h) => ({
-    date: h.date,
-    value: h.pred_marathon_s,
-    tip: `${shortDate(h.date)} · maraton ${fmtRaceTime(h.pred_marathon_s)}`
-        + (h.pred_half_s ? ` · halv ${fmtRaceTime(h.pred_half_s)}` : '')
-        + ` · ${fmtPace(h.pred_marathon_s / 42.195)}/km`
-}));
+// Garmin gir fire løpsprediksjoner, og alle fire ligger i history.json med ett
+// punkt per dato. Hvilke som VISES styres av PREDIKSJONER under — de fire er
+// samme graf med ulike tall, så de bygges av samme kode i stedet for å
+// kopieres.
+const DISTANSER = {
+    // `tittel` står for hånd fordi norsk setter sammen ord uten bindestrek,
+    // mens et tall foran krever den: «5 km-prediksjon», «maratonprediksjon».
+    k5: { navn: '5 km', tittel: '5 km-prediksjon', km: 5, felt: 'pred_k5_s', tickSteps: [5, 10, 15, 30, 60] },
+    k10: { navn: '10 km', tittel: '10 km-prediksjon', km: 10, felt: 'pred_k10_s', tickSteps: [10, 15, 30, 60, 120] },
+    half: { navn: 'halvmaraton', tittel: 'halvmaratonprediksjon', km: 21.0975, felt: 'pred_half_s', tickSteps: [30, 60, 120, 300] },
+    marathon: { navn: 'maraton', tittel: 'maratonprediksjon', km: 42.195, felt: 'pred_marathon_s', tickSteps: [60, 120, 300, 600] }
+};
+
+// Rekkefølgen her er rekkefølgen på dashboardet. Bytt fritt — f.eks. til
+// ['half', 'marathon'] hvis du bygger opp mot en langdistanse.
+const PREDIKSJONER = ['k5', 'k10', 'marathon'];
+
+// Målet fra config.json kobles til distansen på ±15 %, så «21.1» og «21.0975»
+// treffer samme graf og en 10 km-milvariant ikke faller mellom to stoler.
+function målFor(km) {
+    return (cfg.races ?? []).find((r) => Math.abs(r.distance_km - km) / km < 0.15);
+}
+
+function prediksjonsGraf(nøkkel) {
+    const d = DISTANSER[nøkkel];
+    const mål = målFor(d.km);
+    const data = history.filter((h) => h[d.felt]).map((h) => ({
+        date: h.date,
+        value: h[d.felt],
+        tip: `${shortDate(h.date)} · ${d.navn} ${fmtRaceTime(h[d.felt])}`
+            + ` · ${fmtPace(h[d.felt] / d.km)}/km`
+    }));
+    return lineChart({
+        title: `Garmins ${d.tittel} over tid (raskere er høyere)`,
+        data, fmt: fmtRaceTime, tickFmt: fmtHm, tickSteps: d.tickSteps, timeAxis: true, invert: true,
+        goal: mål?.goal_seconds ?? null,
+        goalLabel: mål ? `mål ${fmtRaceTime(mål.goal_seconds)}` : ''
+    });
+}
 
 // --- SVG-generering ---------------------------------------------------------
 
@@ -218,10 +242,18 @@ function svgCard(title, inner) {
 // --- fliser (hero-tall) -----------------------------------------------------
 
 const st = summary.status ?? {};
-const predByKm = { 21.1: st.predictions_s?.half, 42.2: st.predictions_s?.marathon };
+// Prediksjonen på løps-flisa slås opp på distanse. Tidligere var bare halv og
+// maraton med, så et 5- eller 10 km-løp i config.json sto uten prediksjon.
+const predByKm = [
+    [5, st.predictions_s?.k5],
+    [10, st.predictions_s?.k10],
+    [21.0975, st.predictions_s?.half],
+    [42.195, st.predictions_s?.marathon]
+];
+const predFor = (km) => (predByKm.find(([d]) => Math.abs(d - km) / km < 0.15) ?? [])[1];
 const raceTiles = (cfg.races ?? []).map((race) => {
     const daysLeft = Math.ceil((new Date(race.date) - Date.now()) / 86_400_000);
-    const pred = predByKm[race.distance_km];
+    const pred = predFor(race.distance_km);
     const gap = pred ? pred - race.goal_seconds : null;
     return `<div class="tile">
   <div class="tile-label">${esc(race.name)}</div>
@@ -328,18 +360,7 @@ ${lineChart({
     title: 'Terskelfart over tid (min/km — raskere er høyere)',
     data: thresholdSeries, fmt: fmtPace, tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
 })}
-${lineChart({
-    title: 'Garmins halvmaratonprediksjon over tid (raskere er høyere)',
-    data: halfSeries, fmt: fmtRaceTime, tickFmt: fmtHm, tickSteps: [30, 60, 120, 300], timeAxis: true, invert: true,
-    goal: halfGoal?.goal_seconds ?? null,
-    goalLabel: halfGoal ? `mål ${fmtRaceTime(halfGoal.goal_seconds)}` : ''
-})}
-${lineChart({
-    title: 'Garmins maratonprediksjon over tid (raskere er høyere)',
-    data: marathonSeries, fmt: fmtRaceTime, tickFmt: fmtHm, tickSteps: [60, 120, 300, 600], timeAxis: true, invert: true,
-    goal: marathonGoal?.goal_seconds ?? null,
-    goalLabel: marathonGoal ? `mål ${fmtRaceTime(marathonGoal.goal_seconds)}` : ''
-})}
+${PREDIKSJONER.map(prediksjonsGraf).join('\n')}
 ${lineChart({ title: 'HRV natt, siste 60 dager (ms)', data: hrvSeries })}
 ${lineChart({ title: 'Hvilepuls, siste 60 dager (slag/min)', data: rhrSeries })}
 ${barChart({ title: 'Søvn, siste 30 dager (timer)', data: sleepSeries })}

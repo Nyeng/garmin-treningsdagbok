@@ -3,9 +3,40 @@
 > Idéen kommer fra **Sondre Wittek** ([@sonwit](https://github.com/sonwit)) —
 > takk for tipset. Dette repoet er min egen gjennomføring av den.
 
-Kobler Garmin Connect til ditt eget GitHub-repo: henter treningsdata ned,
+Kobler Garmin Connect til dine egne GitHub-repoer: henter treningsdata ned,
 lagrer den som JSON du eier selv, og pusher strukturerte økter, styrkeprogram
 og løyper den andre veien — så de dukker opp på klokka.
+
+## ⚠️ Oppsettet krever TO repoer
+
+Dette prosjektet er bygget rundt en deling som er verdt å forstå før du gjør
+noe som helst:
+
+| Repo | Innhold | Synlighet |
+|---|---|---|
+| **kode-repoet** (dette) | skriptene, `config.json`, `workout.json` | **offentlig** — koden er generell og deles fritt |
+| **data-repoet** | all treningsdata, dashboardet, fix-filene | **privat** — søvn, HRV, vekt og GPS-spor |
+
+De to kobles med miljøvariabelen **`GARMIN_DATA_DIR`**, som peker fra koden til
+data-repoet:
+
+```bash
+export GARMIN_DATA_DIR=~/Repos/garmin-data   # legg den i ~/.zshrc
+```
+
+**Hvorfor delt:** `data/` inneholder hvor du sov, hvor tung du var og hvert
+GPS-spor du har løpt — altså hvor du bor. Det hører ikke hjemme i et offentlig
+repo. Men dataene trenger likevel versjonering og backup: **VO2max-trenden i
+`history.json` kan ikke gjenskapes** — Garmin gir bare siste verdi, så den
+bygges ett punkt per synk og finnes ingen andre steder. Derfor et *privat repo*,
+ikke en `.gitignore` alene.
+
+**Er ikke `GARMIN_DATA_DIR` satt**, faller alt tilbake på `data/` her — som er
+gitignorert, så ingenting lekker. Da virker prosjektet på én maskin uten backup.
+Fullt oppsett står i
+[Public repo — og hvor dataene bor](#public-repo--og-hvor-dataene-bor).
+
+---
 
 Ingen offisiell Garmin-API-nøkkel trengs. Alt går gjennom det samme
 private API-et som Garmin Connect-appen selv bruker, via
@@ -15,7 +46,7 @@ private API-et som Garmin Connect-appen selv bruker, via
 
 | | |
 |---|---|
-| `sync.js` | henter aktiviteter, splits, søvn, HRV, hvilepuls, vekt, VO2max, prediksjoner → `data/` |
+| `sync.js` | henter aktiviteter, splits, søvn, HRV, hvilepuls, vekt, VO2max, prediksjoner → data-repoet |
 | `stats.js` | ukesstatistikk, restitusjon, nedtelling til løp, i terminalen |
 | `push-workout.js` | dagens økt fra `workout.json` → strukturert økt i Garmin Connect |
 | `push-strength.js` | faste styrkeøkter → øktbiblioteket i Garmin |
@@ -23,17 +54,13 @@ private API-et som Garmin Connect-appen selv bruker, via
 | `finn-loype.js` / `finn-bakke.js` | finner flate teststrekk og jevne intervallbakker fra OSM + Kartverket (**Norge**) |
 | `fix-threshold.js` / `fix-strength.js` | retter terskelverdier og loggede styrkesett ved kilden |
 | `build-dashboard.js` | statisk `dashboard.html` med form, volum og restitusjon over tid |
-| `.github/workflows/` | synk to ganger daglig i skya, og push av økter når filene endres |
+| `lib/paths.js` | eneste sted datastien defineres — leser `GARMIN_DATA_DIR` |
+| `.github/workflows/` | push av økter når filene endres (synken ligger i data-repoet) |
 | `proxy/` | **valgfritt** — Cloud Run-proxy som gir en AI-agent lesetilgang uten å gi den Garmin-tokenet ditt |
 
 Koden er skrevet for å leses av en AI-assistent (Claude Code, Cursor,
 Copilot) like mye som av deg: dataene ligger som flate JSON-filer på disk, med
-et destillat i `data/summary.json` som er ment å være det en analyse leser.
-
-> **Dette repoet er offentlig — dataene er det ikke.** Koden deles fritt, mens
-> helsedataene ligger i et separat **privat** repo som `GARMIN_DATA_DIR` peker
-> på. Se [Public repo — og hvor dataene bor](#public-repo--og-hvor-dataene-bor)
-> rett under, og [Personvern og sikkerhet](#personvern-og-sikkerhet) nederst.
+et destillat i `summary.json` som er ment å være det en analyse leser.
 
 ---
 
@@ -112,9 +139,10 @@ inneholder hvor du sov, hvor tung du var og hvor du bor, og at det ikke hører
 hjemme i et offentlig repo.
 
 Dataene trenger likevel et sted å bo som ikke er én disk. Særlig
-`data/history.json`: den er **append-only og kan ikke gjenskapes** — Garmin gir
-bare *siste* verdi for VO2max og prediksjoner, så formtrenden din finnes ingen
-andre steder. Derfor et privat repo og ikke en `.gitignore` alene.
+`history.json`. Den er append-only, og **VO2max-kurven kan ikke gjenskapes**:
+Garmin gir bare siste verdi, så den bygges ett punkt per synk fra den dagen du
+begynner. (Løpsprediksjonene er derimot daterte serier og backfilles ett år
+bakover ved første synk — se under.) Derfor et privat repo og ikke en `.gitignore` alene.
 
 ### `GARMIN_DATA_DIR`
 
@@ -531,6 +559,17 @@ fila lokalt i nettleseren. Den skrives til **datamappa**, ikke hit: den er
 avledet av `summary.json` og inneholder de samme helsedataene i grafform, så den
 hører hjemme i det private repoet.
 
+**Hvilke prediksjonsgrafer som vises** styres av `PREDIKSJONER` øverst i
+`build-dashboard.js`. Garmin gir alle fire distansene, og de ligger i
+`history.json` uansett — lista velger bare hva som tegnes:
+
+```js
+const PREDIKSJONER = ['k5', 'k10', 'marathon'];   // bytt fritt: 'half' finnes også
+```
+
+Målet fra `config.json` kobles til riktig graf på distanse (±15 %), så et løp
+på 10 km får målstreken sin i 10 km-grafen.
+
 De to formgrafene har **invertert y-akse** — de viser tider, så linja peker
 oppover når formen blir bedre. Punktene ligger etter dato, ikke jevnt fordelt:
 Garmin oppdaterer terskelen bare på økter som kvalifiserer, så serien har hull.
@@ -553,8 +592,9 @@ data/
   corrections.json       # rettelser til Garmins rådata, brukt når summary.json bygges
   status.json            # VO2max, treningsstatus, løpsprediksjoner, terskel, rekorder,
                          # samt vekt som serie over siste år
-  history.json           # formmålerne per dato. APPEND-ONLY, kan IKKE regenereres —
-                         # bygges opp ett punkt per synk (lib/history.js)
+  history.json           # formmålerne per dato. APPEND-ONLY (lib/history.js).
+                         # Prediksjonene backfilles 1 år ved første synk;
+                         # VO2max kan IKKE regenereres — ett punkt per synk
   backup/                # sikkerhetskopi av brukerprofilen før hver skriving
   last_sync.txt          # dato for siste synk
   dashboard.html         # statisk dashboard, bygget av build-dashboard.js
@@ -574,9 +614,16 @@ workout.json             # dagens økt som data
 uleselige, destillatet er det en analyse — din egen eller en AI-assistents —
 faktisk skal lese.
 
-`history.json` kan **ikke** gjenskapes: Garmin gir bare *siste* verdi for
-VO2max og prediksjoner, så trenden finnes ingen andre steder enn her. Slett den
-aldri.
+`history.json` er delvis uerstattelig, og skillet er verdt å kjenne:
+
+| Felt | Backfilles? |
+|---|---|
+| `pred_k5_s`, `pred_k10_s`, `pred_half_s`, `pred_marathon_s` | **ja** — Garmin serverer daterte serier, og `syncStatus` henter et helt år |
+| `vo2max` | **nei** — bare siste verdi finnes. Ett punkt per synk, fra dagen du begynner |
+
+Merk at årsvinduet i `syncStatus` er hardkodet (`sync.js`), uavhengig av
+`--days`: en bredere backfill gir flere aktiviteter og daglige helsedata, men
+ikke lengre formkurve. Slett aldri fila.
 
 ---
 
