@@ -111,7 +111,7 @@ const weekly = weekOrder.map((k) => {
     const w = byWeek.get(k) ?? { km: 0, n: 0, time: 0 };
     const sick = sickWeekKeys.has(k);
     return {
-        date: weekDateOf.get(k), label: k.slice(5), value: w.km, sick,
+        date: weekDateOf.get(k), label: k.slice(5), value: w.km, cls: sick ? 'bar bar-sick' : 'bar',
         tip: `${k} · ${w.km.toFixed(1)} km · ${w.n} økter · ${fmtDur(w.time)}${sick ? ' · sykdom' : ''}`
     };
 });
@@ -123,12 +123,26 @@ const seriesOf = (field) =>
 
 const rhrSeries = seriesOf('rhr').map((p) => ({ ...p, tip: `${shortDate(p.date)} · hvilepuls ${p.value}` }));
 const sykdomsBands = (markers.illness ?? []).map((m) => ({ from: m.start, to: m.end, label: m.label }));
-const hrvSeries = seriesOf('hrv').map((p) => ({ ...p, tip: `${shortDate(p.date)} · HRV ${p.value} ms` }));
-const sleepSeries = seriesOf('sleep_h').map((p) => {
-    const score = days.find((d) => d.date === p.date)?.sleep_score;
-    return { date: p.date, label: shortDate(p.date), value: p.value, tip: `${shortDate(p.date)} · ${p.value.toFixed(1)} t søvn${score ? ` · score ${score}` : ''}` };
+// Søylefarge etter søvn-score (kvalitet), ikke stadium-fordeling — det som
+// faktisk svarer på "hvor bra sov jeg", uten å måtte tolke tre stablede lag.
+// Grensene følger Garmins egne score-band (poor/fair/good/excellent).
+function søvnKlasse(score) {
+    if (score == null) return 'bar';
+    if (score >= 90) return 'bar sleep-excellent';
+    if (score >= 80) return 'bar sleep-good';
+    if (score >= 60) return 'bar sleep-fair';
+    return 'bar sleep-poor';
+}
+const sleepSeries = days.filter((d) => d.sleep_h != null).map((d) => {
+    const scoreTxt = d.sleep_score ? ` · score ${d.sleep_score}` : ' · ingen score';
+    return {
+        date: d.date, label: shortDate(d.date), value: d.sleep_h, cls: søvnKlasse(d.sleep_score),
+        tip: `${shortDate(d.date)} · ${d.sleep_h.toFixed(1)} t søvn${scoreTxt}`
+    };
 });
-const readinessSeries = seriesOf('readiness').map((p) => ({ ...p, tip: `${shortDate(p.date)} · klarhet ${p.value}` }));
+// HRV og treningsklarhet er UTELATT med vilje: klokka rapporterer aldri disse
+// feltene (0 av 366 dager har verdi, bekreftet empirisk) — grafer for dem
+// ville bare vist "ikke nok data" for alltid, ikke en reell mangel på historikk.
 
 // formhistorikk (data/history.json) — punktene kommer når Garmin oppdaterer
 // dem, ikke hver dag, så disse to tegnes på tidsakse
@@ -183,7 +197,7 @@ function prediksjonsGraf(nøkkel) {
 
 // --- SVG-generering ---------------------------------------------------------
 
-const W = 520, H = 200, PAD = { t: 14, r: 14, b: 26, l: 38 };
+const W = 560, H = 240, PAD = { t: 16, r: 16, b: 28, l: 44 };
 const plotW = W - PAD.l - PAD.r, plotH = H - PAD.t - PAD.b;
 
 // `steps` er de tillatte trinnstørrelsene. Standardlista skaleres etter
@@ -213,17 +227,24 @@ function xLabels(points, labelOf, xOf) {
 }
 
 // stolpediagram: 4px avrundede data-ender mot toppen, forankret i grunnlinja, 2px mellomrom
+// `cls` (valgfritt per punkt) overstyrer søyle-fargen — brukes til å farge
+// etter kvalitet/status (f.eks. søvn-score, sykdomsuke) i stedet for én fast
+// serie-farge for alle søyler.
+//
+// Forsøkte en tidsakse-variant her (samme prinsipp som lineChart) for å vise
+// hull i serien som faktisk mellomrom, men ga ikke et godt nok resultat i
+// praksis — droppet igjen. Indeksbasert jevn fordeling, som før.
 function barChart({ title, data, unit = '' }) {
     if (!data.length) return '';
     const max = Math.max(...data.map((d) => d.value)) * 1.1;
     const yOf = (v) => PAD.t + plotH * (1 - v / max);
     const slot = plotW / data.length;
-    const bw = Math.max(4, slot - 2);
+    const bw = Math.max(4, Math.min(slot - 2, 32));
     const bars = data.map((d, i) => {
         const x = PAD.l + i * slot + (slot - bw) / 2;
         const y = yOf(d.value), h = Math.max(0, H - PAD.b - y);
         const r = Math.min(4, bw / 2, h);
-        const cls = d.sick ? 'bar bar-sick' : 'bar';
+        const cls = d.cls ?? 'bar';
         return `<path d="M${x},${H - PAD.b} v${-(h - r)} q0,${-r} ${r},${-r} h${bw - 2 * r} q${r},0 ${r},${r} v${h - r} z" class="${cls}" data-tip="${esc(d.tip)}"/>`;
     }).join('');
     const last = data[data.length - 1];
@@ -344,87 +365,13 @@ const raceTiles = (cfg.races ?? []).map((race) => {
 </div>`;
 }).join('');
 
-const latestReadiness = [...days].reverse().find((d) => d.readiness != null);
 const vo2Tile = st.vo2max ? `<div class="tile">
   <div class="tile-label">VO2max (løp)</div>
   <div class="tile-value">${st.vo2max.value}</div>
   <div class="tile-sub">per ${esc(st.vo2max.date ? fullDate(st.vo2max.date) : '')}${st.threshold ? ` · terskel ${fmtPace(st.threshold.pace_s_per_km)}/km @ ${st.threshold.hr}` : ''}</div>
 </div>` : '';
-const readinessTile = latestReadiness ? `<div class="tile">
-  <div class="tile-label">Treningsklarhet</div>
-  <div class="tile-value">${latestReadiness.readiness}<span class="tile-unit">/100</span></div>
-  <div class="tile-sub">per ${esc(fullDate(latestReadiness.date))}</div>
-</div>` : '';
-
-// --- fart per pulssone, stigningsjustert ------------------------------------
-//
-// Rått tempo (pace_s) er ikke sammenlignbart på tvers av økter når pendlerruta
-// har reell, sammenhengende stigning — en tung uke i bakkene ville sett ut som
-// en treg uke. `gap_s` (Garmins avgGradeAdjustedSpeed) er tempoet omregnet til
-// hva det ville vært på flatt, og brukes derfor her i stedet for pace_s.
-// Bøttet på pulssone i tillegg, fordi rolig, moderat og terskel ikke er samme
-// type økt — én sammenslått linje ville blandet inn treningstype som støy.
-const alleLøp = days.flatMap((d) => (d.runs ?? []).map((r) => ({ ...r, date: d.date })));
-
-const HR_SONER = [
-    { key: 'rolig', navn: 'rolig (puls < 155)', test: (hr) => hr < 155 },
-    { key: 'moderat', navn: 'moderat (puls 155–171)', test: (hr) => hr >= 155 && hr < 172 },
-    { key: 'hardt', navn: 'hardt/terskel (puls ≥ 172)', test: (hr) => hr >= 172 }
-];
-
-function pacePerSoneGraf(sone) {
-    const points = alleLøp
-        .filter((r) => r.hr != null && sone.test(r.hr) && (r.gap_s ?? r.pace_s))
-        .map((r) => {
-            const val = r.gap_s ?? r.pace_s;
-            return {
-                date: r.date,
-                value: val,
-                tip: `${shortDate(r.date)} · ${fmtPace(val)}/km${r.gap_s ? ' (stigningsjustert)' : ''} · puls ${r.hr}${r.elev_m ? ` · ${r.elev_m} hm` : ''}`
-            };
-        });
-    return filterableChart({
-        id: `chart-pace-${sone.key}`, kind: 'line',
-        title: `Fart, ${sone.navn}, stigningsjustert (min/km — raskere er høyere)`,
-        points, fmtKey: 'pace', tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
-    });
-}
-
-// --- pulsdrift innad i siste harde/intervall-økt ----------------------------
-//
-// Samme sjekk som gjøres for hånd når formen skal vurderes etter sykdom/pause:
-// kryper snittpulsen oppover drag for drag ved samme innsats, er kroppen ikke
-// restituert ennå, selv om det ikke føles sånn. Plukker siste økt med et
-// "N x M"-navnemønster (strukturerte økter arver dette navnet fra Garmin når
-// de fullføres), og leser lapDTOs fra data/splits/<id>.json.
-//
-// To fallgruver fra CLAUDE.md respekteres her: en lap med avgSpeed > maxSpeed
-// er ugyldig (matematisk umulig, dropp den), og lap-snitt under ~30 sek er
-// ubrukelige (for korte drag til at gjennomsnittet betyr noe).
-const INTERVALL_NAVN = /\d+\s*x\s*\d/i;
-const sisteIntervall = [...alleLøp].reverse().find((r) => r.id && INTERVALL_NAVN.test(r.name ?? ''));
-const intervallSplitsPath = sisteIntervall ? join(DATA, 'splits', `${sisteIntervall.id}.json`) : null;
-const intervallSplits = intervallSplitsPath && existsSync(intervallSplitsPath)
-    ? JSON.parse(readFileSync(intervallSplitsPath, 'utf8'))
-    : null;
-const gyldigeLapper = (intervallSplits?.lapDTOs ?? []).filter((l) =>
-    l.averageHR != null && l.duration >= 30 && l.averageSpeed <= l.maxSpeed + 0.001);
-
-const pulsdriftTittel = sisteIntervall
-    ? `Pulsdrift per drag, siste intervalløkt: ${sisteIntervall.name} (${fullDate(sisteIntervall.date)})`
-    : '';
-const pulsdriftGraf = sisteIntervall && gyldigeLapper.length >= 2
-    ? svgCard(pulsdriftTittel, lineChart({
-        title: pulsdriftTittel,
-        data: gyldigeLapper.map((l, i) => ({
-            value: l.averageHR,
-            label: String(i + 1),
-            tip: `Drag ${i + 1} · puls ${Math.round(l.averageHR)} · ${fmtPace(l.duration / (l.distance / 1000))}/km · ${Math.round(l.duration)} sek`
-        })),
-        fmt: (v) => Math.round(v),
-        labelOf: (d) => d.label
-    }))
-    : '';
+// Ingen treningsklarhet-flis: klokka rapporterer feltet aldri (se merknad ved
+// seriesOf over) — flisa ville aldri vist noe uansett.
 
 // --- ramp rate: volumendring mot siste FULLFØRTE uke ------------------------
 //
@@ -501,47 +448,79 @@ const weekdayOf = (iso) => {
     return navn.charAt(0).toUpperCase() + navn.slice(1);
 };
 
-const upcomingWorkouts = (plan?.workouts ?? [])
-    .filter((w) => w.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 7);
+// Denne uka (mandag–søndag), slått sammen til én liste: dager med et faktisk
+// registrert løp viser RESULTATET (inkl. drag/laps for strukturerte økter),
+// dager uten viser PLANEN i stedet. Det avgjøres per dag på om det finnes en
+// faktisk økt, ikke på om datoen er i fortiden — så "i dag" viser resultatet
+// med én gang økta er logget, i stedet for å vise gårsdagens plan hele dagen.
+function startOfIsoWeek(dateStr) {
+    const d = new Date(`${dateStr}T12:00:00`);
+    const dag = d.getDay() || 7; // mandag=1 .. søndag=7
+    d.setDate(d.getDate() - (dag - 1));
+    return d.toISOString().slice(0, 10);
+}
+function endOfIsoWeek(dateStr) {
+    const d = new Date(`${dateStr}T12:00:00`);
+    const dag = d.getDay() || 7;
+    d.setDate(d.getDate() + (7 - dag));
+    return d.toISOString().slice(0, 10);
+}
+const ukeDatoer = [];
+for (let d = new Date(`${startOfIsoWeek(today)}T12:00:00`); d.toISOString().slice(0, 10) <= endOfIsoWeek(today); d.setDate(d.getDate() + 1)) {
+    ukeDatoer.push(d.toISOString().slice(0, 10));
+}
 
-const upcomingHtml = upcomingWorkouts.length ? `<div class="plan">
-${upcomingWorkouts.map((w) => `<div class="plan-item${w.date === today ? ' today' : ''}">
-  <div class="plan-when">${w.date === today ? 'I dag' : weekdayOf(w.date)} <span class="plan-date">${shortDate(w.date)}</span></div>
-  <div class="plan-body">
-    <div class="plan-name">${esc(w.name)}</div>
-    <div class="plan-steps">${esc(describeSteps(w.steps))}</div>
-    ${w.rationale ? `<div class="plan-rationale">${esc(w.rationale)}</div>` : ''}
-  </div>
-</div>`).join('\n')}
-</div>` : '';
+// Kompakt drag-for-drag-oppsummering for en økt med gyldige splits — samme
+// fallgruve-filter som pulsdrift-grafen (ugyldige/for korte lap droppes).
+function lapsSammendrag(run) {
+    if (!run?.id) return '';
+    const path = join(DATA, 'splits', `${run.id}.json`);
+    if (!existsSync(path)) return '';
+    let splits;
+    try { splits = JSON.parse(readFileSync(path, 'utf8')); } catch { return ''; }
+    const laps = (splits.lapDTOs ?? []).filter((l) =>
+        l.averageHR != null && l.duration >= 30 && l.averageSpeed <= l.maxSpeed + 0.001);
+    if (laps.length < 2) return '';
+    return laps.map((l, i) => `#${i + 1} ${fmtPace(l.duration / (l.distance / 1000))}/km @ ${Math.round(l.averageHR)}`).join(' · ');
+}
 
-// --- etterlevelse: plan vs. faktisk, siste dager -----------------------------
-
-const ADHERENCE_DAYS = 10;
-const adherenceCutoff = new Date(Date.now() - ADHERENCE_DAYS * 86_400_000).toISOString().slice(0, 10);
-const pastWorkouts = (plan?.workouts ?? [])
-    .filter((w) => w.date < today && w.date >= adherenceCutoff)
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-const adherenceHtml = pastWorkouts.length ? `<div class="plan">
-${pastWorkouts.map((w) => {
-    const faktiskeLøp = days.find((d) => d.date === w.date)?.runs ?? [];
+const ukeRader = ukeDatoer.map((dato) => {
+    const planer = (plan?.workouts ?? []).filter((w) => w.date === dato);
+    const faktiskeLøp = days.find((d) => d.date === dato)?.runs ?? [];
     const gjort = faktiskeLøp.length > 0;
-    const faktiskTekst = gjort
-        ? faktiskeLøp.map((r) => `${r.km ?? '?'} km${r.pace_s ? ` · ${fmtPace(r.pace_s)}/km` : ''}${r.hr ? ` @ puls ${r.hr}` : ''}`).join(' + ')
-        : 'Ingen økt registrert';
-    return `<div class="plan-item${gjort ? '' : ' missed'}">
-  <div class="plan-when">${weekdayOf(w.date)} <span class="plan-date">${shortDate(w.date)}</span></div>
+    const erFortid = dato < today;
+    const naar = `${dato === today ? 'I dag' : weekdayOf(dato)} <span class="plan-date">${shortDate(dato)}</span>`;
+
+    if (gjort) {
+        const planTekst = planer.length ? `<div class="plan-steps">Plan: ${esc(planer.map((w) => w.name).join(' + '))}</div>` : '';
+        const resultatHtml = faktiskeLøp.map((r) => {
+            const laps = lapsSammendrag(r);
+            const linje = `${r.km ?? '?'} km${r.pace_s ? ` · ${fmtPace(r.pace_s)}/km` : ''}${r.hr ? ` @ puls ${r.hr}` : ''}`;
+            return `<div class="plan-actual">${esc(linje)}${r.name ? ` <span class="plan-actual-name">(${esc(r.name)})</span>` : ''}</div>` +
+                (laps ? `<div class="plan-laps">${esc(laps)}</div>` : '');
+        }).join('');
+        return `<div class="plan-item done${dato === today ? ' today' : ''}">
+  <div class="plan-when">${naar}</div>
   <div class="plan-body">
-    <div class="plan-name">${gjort ? '✓' : '—'} ${esc(w.name)}</div>
-    <div class="plan-steps">Plan: ${esc(describeSteps(w.steps))}</div>
-    <div class="plan-actual">Faktisk: ${esc(faktiskTekst)}</div>
+    <div class="plan-name">✓ Gjennomført</div>
+    ${planTekst}
+    ${resultatHtml}
   </div>
 </div>`;
-}).join('\n')}
-</div>` : '';
+    }
+
+    if (!planer.length) return '';
+    return planer.map((w) => `<div class="plan-item${dato === today ? ' today' : ''}${erFortid ? ' missed' : ''}">
+  <div class="plan-when">${naar}</div>
+  <div class="plan-body">
+    <div class="plan-name">${erFortid ? '— ' : ''}${esc(w.name)}</div>
+    <div class="plan-steps">${esc(describeSteps(w.steps))}</div>
+    ${w.rationale && !erFortid ? `<div class="plan-rationale">${esc(w.rationale)}</div>` : ''}
+  </div>
+</div>`).join('\n');
+}).filter(Boolean);
+
+const ukeHtml = ukeRader.length ? `<div class="plan">\n${ukeRader.join('\n')}\n</div>` : '';
 
 // --- tabellvisning (tilgjengelighet + rask lesing) --------------------------
 
@@ -565,6 +544,7 @@ const html = `<!doctype html>
   --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
   --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
   --series: #2a78d6; --good: #006300; --bad: #d03b3b;
+  --sleep-fair: #c98a1f; --sleep-good: #6a9c2e;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -573,6 +553,7 @@ const html = `<!doctype html>
     --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
     --series: #3987e5; --good: #0ca30c; --bad: #e66767;
+    --sleep-fair: #d9a13f; --sleep-good: #8ec14a;
   }
 }
 * { box-sizing: border-box; }
@@ -599,24 +580,32 @@ h2 { font-size: 1rem; margin: 22px 0 8px; }
   border-radius: 10px; padding: 10px 14px; align-items: baseline; }
 .plan-item.today { border-color: var(--series); border-width: 1.5px; }
 .plan-item.missed { opacity: 0.7; }
+.plan-item.done { border-color: var(--good); }
+.plan-item.done .plan-name { color: var(--good); }
 .plan-when { flex: 0 0 auto; width: 92px; font-size: 0.8rem; color: var(--ink-2); }
 .plan-date { display: block; color: var(--muted); font-size: 0.75rem; }
 .plan-body { flex: 1 1 auto; min-width: 0; }
 .plan-name { font-weight: 600; font-size: 0.9rem; }
 .plan-steps, .plan-actual { color: var(--ink-2); font-size: 0.8rem; margin-top: 2px; }
+.plan-actual-name { color: var(--muted); }
+.plan-laps { color: var(--muted); font-size: 0.75rem; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .plan-rationale { color: var(--muted); font-size: 0.78rem; margin-top: 4px; font-style: italic; }
 .bar-sick { fill: var(--muted); opacity: 0.5; }
 .band { fill: var(--bad); opacity: 0.08; }
-.band-label { fill: var(--muted); font-size: 8px; }
-.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 12px 6px; margin: 0; }
-.card figcaption { font-size: 0.85rem; font-weight: 600; margin: 0 0 4px 4px; }
+.band-label { fill: var(--muted); font-size: 9.5px; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px 8px; margin: 0; cursor: zoom-in; }
+.card.expanded { grid-column: 1 / -1; cursor: zoom-out; }
+.card.expanded svg { max-height: 78vh; }
+.card figcaption { font-size: 0.92rem; font-weight: 600; margin: 0 0 6px 2px; }
 svg { width: 100%; height: auto; display: block; }
 .grid { stroke: var(--grid); stroke-width: 1; }
 .axis { stroke: var(--axis); stroke-width: 1; }
-.tick { fill: var(--muted); font-size: 9px; }
-.direct { fill: var(--ink-2); font-size: 10px; font-weight: 600; }
+.tick { fill: var(--ink-2); font-size: 11px; }
+.direct { fill: var(--ink); font-size: 12px; font-weight: 700; }
 .bar { fill: var(--series); }
+.sleep-poor { fill: var(--bad); } .sleep-fair { fill: var(--sleep-fair); }
+.sleep-good { fill: var(--sleep-good); } .sleep-excellent { fill: var(--good); }
 .bar:hover { opacity: 0.85; }
 .line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; }
 .goal { stroke: var(--good); stroke-width: 1.5; stroke-dasharray: 4 3; }
@@ -638,14 +627,11 @@ th { color: var(--ink-2); border-bottom: 1px solid var(--grid); }
 <main>
 <h1>Løpedagbok</h1>
 <p class="updated">Data synket ${esc(st.synced_at ? fullTimestamp(st.synced_at) : '?')} UTC · dashboard bygget ${esc(fullTimestamp(new Date().toISOString()))} UTC</p>
+${ukeHtml ? `<h2>Denne uka</h2>\n${ukeHtml}` : ''}
 <div class="tiles">
-${raceTiles}
 ${vo2Tile}
-${readinessTile}
 ${rampTile}
 </div>
-${upcomingHtml ? `<h2>Kommende økter</h2>\n${upcomingHtml}` : ''}
-${adherenceHtml ? `<h2>Etterlevelse, siste ${ADHERENCE_DAYS} dager</h2>\n${adherenceHtml}` : ''}
 <div class="range-picker" role="group" aria-label="Tidsperiode for grafene">
 ${RANGES.map((r) => `<button type="button" data-range="${r.days}">${esc(r.label)}</button>`).join('\n')}
 </div>
@@ -655,14 +641,13 @@ ${filterableChart({
     id: 'chart-threshold', kind: 'line', title: 'Terskelfart over tid (min/km — raskere er høyere)',
     points: thresholdSeries, fmtKey: 'pace', tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
 })}
+${filterableChart({ id: 'chart-rhr', kind: 'line', title: 'Hvilepuls (slag/min)', points: rhrSeries, bands: sykdomsBands, timeAxis: true })}
+${filterableChart({ id: 'chart-sleep', kind: 'bar', title: 'Søvn, farget etter score (timer)', points: sleepSeries })}
 ${PREDIKSJONER.map(prediksjonsGraf).join('\n')}
-${HR_SONER.map(pacePerSoneGraf).join('\n')}
-${pulsdriftGraf}
 ${prCard}
-${filterableChart({ id: 'chart-hrv', kind: 'line', title: 'HRV natt (ms)', points: hrvSeries })}
-${filterableChart({ id: 'chart-rhr', kind: 'line', title: 'Hvilepuls (slag/min)', points: rhrSeries, bands: sykdomsBands })}
-${filterableChart({ id: 'chart-sleep', kind: 'bar', title: 'Søvn (timer)', points: sleepSeries })}
-${filterableChart({ id: 'chart-readiness', kind: 'line', title: 'Treningsklarhet (0–100)', points: readinessSeries })}
+</div>
+<div class="tiles">
+${raceTiles}
 </div>
 <details>
 <summary>Tabell: siste 14 dager</summary>
@@ -747,6 +732,17 @@ document.querySelectorAll('.range-picker button').forEach((b) => {
 });
 
 applyRange(Number(localStorage.getItem('dashboardRange') ?? ${DEFAULT_RANGE_DAYS}));
+
+// Klikk på et kort for å se grafen større — samme SVG (viewBox er fast),
+// bare gitt mer plass, så den skalerer skarpt opp uten noen ny rendering.
+// Bare ett kort av gangen er utvidet.
+document.querySelectorAll('.charts .card').forEach((card) => {
+  card.addEventListener('click', () => {
+    const wasExpanded = card.classList.contains('expanded');
+    document.querySelectorAll('.charts .card.expanded').forEach((c) => c.classList.remove('expanded'));
+    if (!wasExpanded) card.classList.add('expanded');
+  });
+});
 </script>
 </body>
 </html>
