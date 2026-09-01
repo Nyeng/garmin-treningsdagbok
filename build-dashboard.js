@@ -6,13 +6,19 @@
 // Free/Pro-plan (tilgangsstyring finnes kun på Enterprise), og dette er helsedata.
 // Åpne fila lokalt, eller be Claude vise den.
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { ROOT, DATA } from './lib/paths.js';
 
 const summary = JSON.parse(readFileSync(join(DATA, 'summary.json'), 'utf8'));
 const cfg = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8'));
+const planPath = join(DATA, 'plan.json');
+const plan = existsSync(planPath) ? JSON.parse(readFileSync(planPath, 'utf8')) : null;
+// Sykdoms-/skadeperioder — hører hjemme i data-repoet (privat), samme grunn
+// som plan.json: hvilke uker du var syk er helseinformasjon.
+const markersPath = join(DATA, 'markers.json');
+const markers = existsSync(markersPath) ? JSON.parse(readFileSync(markersPath, 'utf8')) : { illness: [] };
 
 // --- hjelpere ---------------------------------------------------------------
 
@@ -52,6 +58,7 @@ function weekKey(dateStr) {
 
 const days = summary.days;
 const today = new Date().toISOString().slice(0, 10);
+const st = summary.status ?? {};
 
 // ukentlig løpsvolum, siste 16 uker
 const byWeek = new Map();
@@ -68,9 +75,23 @@ for (const d of days) {
 // sammenhengende akse: alle 16 siste uker, også uker uten løp (0 km)
 const weekKeys = Array.from({ length: 16 }, (_, i) =>
     weekKey(new Date(Date.now() - (15 - i) * 7 * 86_400_000).toISOString().slice(0, 10)));
+
+// Hvilke ISO-uker en sykdomsperiode overlapper, så volumfallet får en synlig
+// forklaring i grafen i stedet for å se ut som et uforklart dropp i formen.
+const sickWeekKeys = new Set();
+for (const period of markers.illness ?? []) {
+    for (let d = new Date(`${period.start}T12:00:00`); d <= new Date(`${period.end}T12:00:00`); d.setDate(d.getDate() + 1)) {
+        sickWeekKeys.add(weekKey(d.toISOString().slice(0, 10)));
+    }
+}
+
 const weekly = weekKeys.map((k) => {
     const w = byWeek.get(k) ?? { km: 0, n: 0, time: 0 };
-    return { label: k.slice(5), value: w.km, tip: `${k} · ${w.km.toFixed(1)} km · ${w.n} økter · ${fmtDur(w.time)}` };
+    const sick = sickWeekKeys.has(k);
+    return {
+        label: k.slice(5), value: w.km, sick,
+        tip: `${k} · ${w.km.toFixed(1)} km · ${w.n} økter · ${fmtDur(w.time)}${sick ? ' · sykdom' : ''}`
+    };
 });
 
 const seriesOf = (field, n) =>
@@ -78,6 +99,7 @@ const seriesOf = (field, n) =>
         .map((d) => ({ date: d.date, value: d[field] }));
 
 const rhrSeries = seriesOf('rhr', 60).map((p) => ({ ...p, tip: `${shortDate(p.date)} · hvilepuls ${p.value}` }));
+const sykdomsBands = (markers.illness ?? []).map((m) => ({ from: m.start, to: m.end, label: m.label }));
 const hrvSeries = seriesOf('hrv', 60).map((p) => ({ ...p, tip: `${shortDate(p.date)} · HRV ${p.value} ms` }));
 const sleepSeries = seriesOf('sleep_h', 30).map((p) => {
     const score = days.find((d) => d.date === p.date)?.sleep_score;
@@ -177,7 +199,8 @@ function barChart({ title, data, unit = '' }) {
         const x = PAD.l + i * slot + (slot - bw) / 2;
         const y = yOf(d.value), h = Math.max(0, H - PAD.b - y);
         const r = Math.min(4, bw / 2, h);
-        return `<path d="M${x},${H - PAD.b} v${-(h - r)} q0,${-r} ${r},${-r} h${bw - 2 * r} q${r},0 ${r},${r} v${h - r} z" class="bar" data-tip="${esc(d.tip)}"/>`;
+        const cls = d.sick ? 'bar bar-sick' : 'bar';
+        return `<path d="M${x},${H - PAD.b} v${-(h - r)} q0,${-r} ${r},${-r} h${bw - 2 * r} q${r},0 ${r},${r} v${h - r} z" class="${cls}" data-tip="${esc(d.tip)}"/>`;
     }).join('');
     const last = data[data.length - 1];
     const label = `<text x="${PAD.l + (data.length - 0.5) * slot}" y="${yOf(last.value) - 6}" class="direct" text-anchor="middle">${last.value.toFixed(1)}${unit}</text>`;
@@ -198,7 +221,7 @@ function barChart({ title, data, unit = '' }) {
 // - `tickFmt` er for serier der aksen trenger et kortere format enn
 //   sluttverdien (h:mm på aksen, h:mm:ss på punktet) — 9px-etikettene har bare
 //   PAD.l å gå på før de klippes av venstremargen.
-function lineChart({ title, data, fmt = (v) => v, tickFmt = null, tickSteps = null, timeAxis = false, invert = false, goal = null, goalLabel = '' }) {
+function lineChart({ title, data, fmt = (v) => v, tickFmt = null, tickSteps = null, timeAxis = false, invert = false, goal = null, goalLabel = '', bands = [], labelOf = (d) => shortDate(d.date) }) {
     if (data.length < 2) return '';
     const vals = [...data.map((d) => d.value), ...(goal != null ? [goal] : [])];
     const lo = Math.min(...vals), hi = Math.max(...vals);
@@ -212,6 +235,17 @@ function lineChart({ title, data, fmt = (v) => v, tickFmt = null, tickSteps = nu
     const xOf = timeAxis && span > 0
         ? (i) => PAD.l + (plotW * (times[i] - times[0])) / span
         : (i) => PAD.l + (plotW * i) / (data.length - 1);
+
+    // Skraverte perioder (f.eks. sykdom) — matcher på faktiske datapunkter i
+    // stedet for å regne x-posisjon fra rådatoer, så den treffer riktig
+    // uansett om aksen er tidsbasert eller indeksbasert.
+    const bandRects = bands.map((b) => {
+        const idxs = data.map((_, i) => i).filter((i) => data[i].date >= b.from && data[i].date <= b.to);
+        if (!idxs.length) return '';
+        const x1 = xOf(Math.min(...idxs)), x2 = Math.max(xOf(Math.max(...idxs)), x1 + 2);
+        return `<rect x="${x1.toFixed(1)}" y="${PAD.t}" width="${(x2 - x1).toFixed(1)}" height="${plotH}" class="band" data-tip="${esc(b.label ?? '')}"/>` +
+            `<text x="${(x1 + 3).toFixed(1)}" y="${PAD.t + 9}" class="band-label">${esc(b.label ?? '')}</text>`;
+    }).join('');
 
     const path = data.map((d, i) => `${i ? 'L' : 'M'}${xOf(i).toFixed(1)},${yOf(d.value).toFixed(1)}`).join('');
     // treffflatene deler avstanden til naboene, så de følger punktene også når
@@ -228,10 +262,11 @@ function lineChart({ title, data, fmt = (v) => v, tickFmt = null, tickSteps = nu
         `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${yOf(goal)}" y2="${yOf(goal)}" class="goal"/>` +
         `<text x="${W - PAD.r}" y="${yOf(goal) + (invert ? 12 : -5)}" class="goal-label" text-anchor="end">${esc(goalLabel)}</text>`;
     return svgCard(title,
+        bandRects +
         gridAndAxis(niceTicks(min, max, 4, tickSteps), yOf, tickFmt ?? fmt) + goalLine +
         `<path d="${path}" class="line"/>` + endMark + hits +
         `<circle class="hover-dot" r="4" style="display:none"/>` +
-        xLabels(data, (d) => shortDate(d.date), xOf));
+        xLabels(data, labelOf, xOf));
 }
 
 function svgCard(title, inner) {
@@ -243,7 +278,6 @@ function svgCard(title, inner) {
 
 // --- fliser (hero-tall) -----------------------------------------------------
 
-const st = summary.status ?? {};
 // Prediksjonen på løps-flisa slås opp på distanse. Tidligere var bare halv og
 // maraton med, så et 5- eller 10 km-løp i config.json sto uten prediksjon.
 const predByKm = [
@@ -285,6 +319,189 @@ const readinessTile = latestReadiness ? `<div class="tile">
   <div class="tile-label">Treningsklarhet</div>
   <div class="tile-value">${latestReadiness.readiness}<span class="tile-unit">/100</span></div>
   <div class="tile-sub">per ${esc(fullDate(latestReadiness.date))}</div>
+</div>` : '';
+
+// --- fart per pulssone, stigningsjustert ------------------------------------
+//
+// Rått tempo (pace_s) er ikke sammenlignbart på tvers av økter når pendlerruta
+// har reell, sammenhengende stigning — en tung uke i bakkene ville sett ut som
+// en treg uke. `gap_s` (Garmins avgGradeAdjustedSpeed) er tempoet omregnet til
+// hva det ville vært på flatt, og brukes derfor her i stedet for pace_s.
+// Bøttet på pulssone i tillegg, fordi rolig, moderat og terskel ikke er samme
+// type økt — én sammenslått linje ville blandet inn treningstype som støy.
+const alleLøp = days.flatMap((d) => (d.runs ?? []).map((r) => ({ ...r, date: d.date })));
+
+const HR_SONER = [
+    { navn: 'rolig (puls < 155)', test: (hr) => hr < 155 },
+    { navn: 'moderat (puls 155–171)', test: (hr) => hr >= 155 && hr < 172 },
+    { navn: 'hardt/terskel (puls ≥ 172)', test: (hr) => hr >= 172 }
+];
+
+function pacePerSoneGraf(sone) {
+    const data = alleLøp
+        .filter((r) => r.hr != null && sone.test(r.hr) && (r.gap_s ?? r.pace_s))
+        .map((r) => {
+            const val = r.gap_s ?? r.pace_s;
+            return {
+                date: r.date,
+                value: val,
+                tip: `${shortDate(r.date)} · ${fmtPace(val)}/km${r.gap_s ? ' (stigningsjustert)' : ''} · puls ${r.hr}${r.elev_m ? ` · ${r.elev_m} hm` : ''}`
+            };
+        });
+    return lineChart({
+        title: `Fart, ${sone.navn}, stigningsjustert (min/km — raskere er høyere)`,
+        data, fmt: fmtPace, tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
+    });
+}
+
+// --- pulsdrift innad i siste harde/intervall-økt ----------------------------
+//
+// Samme sjekk som gjøres for hånd når formen skal vurderes etter sykdom/pause:
+// kryper snittpulsen oppover drag for drag ved samme innsats, er kroppen ikke
+// restituert ennå, selv om det ikke føles sånn. Plukker siste økt med et
+// "N x M"-navnemønster (strukturerte økter arver dette navnet fra Garmin når
+// de fullføres), og leser lapDTOs fra data/splits/<id>.json.
+//
+// To fallgruver fra CLAUDE.md respekteres her: en lap med avgSpeed > maxSpeed
+// er ugyldig (matematisk umulig, dropp den), og lap-snitt under ~30 sek er
+// ubrukelige (for korte drag til at gjennomsnittet betyr noe).
+const INTERVALL_NAVN = /\d+\s*x\s*\d/i;
+const sisteIntervall = [...alleLøp].reverse().find((r) => r.id && INTERVALL_NAVN.test(r.name ?? ''));
+const intervallSplitsPath = sisteIntervall ? join(DATA, 'splits', `${sisteIntervall.id}.json`) : null;
+const intervallSplits = intervallSplitsPath && existsSync(intervallSplitsPath)
+    ? JSON.parse(readFileSync(intervallSplitsPath, 'utf8'))
+    : null;
+const gyldigeLapper = (intervallSplits?.lapDTOs ?? []).filter((l) =>
+    l.averageHR != null && l.duration >= 30 && l.averageSpeed <= l.maxSpeed + 0.001);
+
+const pulsdriftGraf = sisteIntervall && gyldigeLapper.length >= 2
+    ? lineChart({
+        title: `Pulsdrift per drag, siste intervalløkt: ${sisteIntervall.name} (${fullDate(sisteIntervall.date)})`,
+        data: gyldigeLapper.map((l, i) => ({
+            value: l.averageHR,
+            label: String(i + 1),
+            tip: `Drag ${i + 1} · puls ${Math.round(l.averageHR)} · ${fmtPace(l.duration / (l.distance / 1000))}/km · ${Math.round(l.duration)} sek`
+        })),
+        fmt: (v) => Math.round(v),
+        labelOf: (d) => d.label
+    })
+    : '';
+
+// --- ramp rate: volumendring mot siste FULLFØRTE uke ------------------------
+//
+// Sammenligner de to siste FULLFØRTE ukene, ikke inneværende uke — en uke som
+// bare er halvveis kjørt ville se ut som et voldsomt fall i volum og gitt et
+// falskt alarmerende tall. weekly[siste] er inneværende (mulig delvis) uke.
+const sisteFulle = weekly.at(-2);
+const foranDen = weekly.at(-3);
+const rampPct = sisteFulle && foranDen && foranDen.value > 0
+    ? ((sisteFulle.value - foranDen.value) / foranDen.value) * 100
+    : null;
+const rampTile = (sisteFulle && foranDen) ? `<div class="tile">
+  <div class="tile-label">Volumendring, siste fullførte uke</div>
+  <div class="tile-value">${rampPct == null ? '–' : `${rampPct > 0 ? '+' : ''}${rampPct.toFixed(0)}<span class="tile-unit">%</span>`}</div>
+  <div class="tile-sub">${sisteFulle.value.toFixed(1)} km vs ${foranDen.value.toFixed(1)} km uka før${rampPct != null && rampPct > 10 ? ' · <span class="behind">over 10 %-regelen</span>' : ''}</div>
+</div>` : '';
+
+// --- personlige rekorder -----------------------------------------------------
+
+const prCard = st.personal_records?.length ? `<figure class="card">
+  <figcaption>Personlige rekorder</figcaption>
+  <table>
+    <thead><tr><th>Distanse</th><th>Tid</th><th>Dato</th></tr></thead>
+    <tbody>
+${st.personal_records.map((r) => `      <tr><td>${esc(r.distanse)}</td><td>${fmtRaceTime(r.tid_s)}</td><td>${r.dato ? fullDate(r.dato) : '–'}</td></tr>`).join('\n')}
+    </tbody>
+  </table>
+</figure>` : '';
+
+// --- kommende økter (fra plan.json) -----------------------------------------
+
+const fmtHrRange = (hr) => {
+    if (!hr) return '';
+    if (hr.min != null && hr.max != null) return `${hr.min}–${hr.max}`;
+    if (hr.max != null) return `<${hr.max}`;
+    if (hr.min != null) return `>${hr.min}`;
+    return '';
+};
+const fmtStepLen = (s) => (s.km != null ? `${s.km} km` : s.minutes != null ? `${s.minutes} min` : s.seconds != null ? `${s.seconds} sek` : '');
+
+// Menneskelesbar oppsummering av stegene, samme grupperingsregel som
+// lib/workout-spec.js: "repeat" på et drag sluker pausen rett etter, så
+// «4 x 6 min med 2 min pause» blir énregel — ikke drag og pause hver for seg.
+function describeSteps(steps = []) {
+    const parts = [];
+    for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        const kind = s.kind ?? s.step;
+        if (kind === 'ramp') continue; // implementasjonsdetalj, ikke del av lesbar plan
+        const len = fmtStepLen(s);
+        const hr = s.hr ? ` @ puls ${fmtHrRange(s.hr)}` : '';
+        if (kind === 'warmup') { parts.push(`${len} oppvarming${hr}`); continue; }
+        if (kind === 'cooldown') { parts.push(`${len} nedjogg`); continue; }
+        if (kind === 'recovery') { parts.push(`${len} pause`); continue; }
+        if (kind === 'interval') {
+            let piece = `${len}${hr}`;
+            if (s.repeat) {
+                const neste = steps[i + 1];
+                const nesteKind = neste?.kind ?? neste?.step;
+                if (neste && nesteKind === 'recovery' && neste.repeat == null) {
+                    piece += ` m/ ${fmtStepLen(neste)} pause`;
+                    i++; // pausen er lest inn i denne linja
+                }
+                piece = `${s.repeat} x ${piece}`;
+            }
+            parts.push(piece);
+        }
+    }
+    return parts.join(' · ');
+}
+
+const weekdayOf = (iso) => {
+    const navn = new Date(`${iso}T12:00:00`).toLocaleDateString('nb-NO', { weekday: 'long' });
+    return navn.charAt(0).toUpperCase() + navn.slice(1);
+};
+
+const upcomingWorkouts = (plan?.workouts ?? [])
+    .filter((w) => w.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 7);
+
+const upcomingHtml = upcomingWorkouts.length ? `<div class="plan">
+${upcomingWorkouts.map((w) => `<div class="plan-item${w.date === today ? ' today' : ''}">
+  <div class="plan-when">${w.date === today ? 'I dag' : weekdayOf(w.date)} <span class="plan-date">${shortDate(w.date)}</span></div>
+  <div class="plan-body">
+    <div class="plan-name">${esc(w.name)}</div>
+    <div class="plan-steps">${esc(describeSteps(w.steps))}</div>
+    ${w.rationale ? `<div class="plan-rationale">${esc(w.rationale)}</div>` : ''}
+  </div>
+</div>`).join('\n')}
+</div>` : '';
+
+// --- etterlevelse: plan vs. faktisk, siste dager -----------------------------
+
+const ADHERENCE_DAYS = 10;
+const adherenceCutoff = new Date(Date.now() - ADHERENCE_DAYS * 86_400_000).toISOString().slice(0, 10);
+const pastWorkouts = (plan?.workouts ?? [])
+    .filter((w) => w.date < today && w.date >= adherenceCutoff)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+const adherenceHtml = pastWorkouts.length ? `<div class="plan">
+${pastWorkouts.map((w) => {
+    const faktiskeLøp = days.find((d) => d.date === w.date)?.runs ?? [];
+    const gjort = faktiskeLøp.length > 0;
+    const faktiskTekst = gjort
+        ? faktiskeLøp.map((r) => `${r.km ?? '?'} km${r.pace_s ? ` · ${fmtPace(r.pace_s)}/km` : ''}${r.hr ? ` @ puls ${r.hr}` : ''}`).join(' + ')
+        : 'Ingen økt registrert';
+    return `<div class="plan-item${gjort ? '' : ' missed'}">
+  <div class="plan-when">${weekdayOf(w.date)} <span class="plan-date">${shortDate(w.date)}</span></div>
+  <div class="plan-body">
+    <div class="plan-name">${gjort ? '✓' : '—'} ${esc(w.name)}</div>
+    <div class="plan-steps">Plan: ${esc(describeSteps(w.steps))}</div>
+    <div class="plan-actual">Faktisk: ${esc(faktiskTekst)}</div>
+  </div>
+</div>`;
+}).join('\n')}
 </div>` : '';
 
 // --- tabellvisning (tilgjengelighet + rask lesing) --------------------------
@@ -332,6 +549,21 @@ h1 { font-size: 1.35rem; margin: 0 0 2px; }
 .tile-unit { font-size: 0.9rem; font-weight: 400; color: var(--ink-2); }
 .tile-sub { color: var(--ink-2); font-size: 0.78rem; }
 .behind { color: var(--bad); } .ahead { color: var(--good); }
+h2 { font-size: 1rem; margin: 22px 0 8px; }
+.plan { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.plan-item { display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px; align-items: baseline; }
+.plan-item.today { border-color: var(--series); border-width: 1.5px; }
+.plan-item.missed { opacity: 0.7; }
+.plan-when { flex: 0 0 auto; width: 92px; font-size: 0.8rem; color: var(--ink-2); }
+.plan-date { display: block; color: var(--muted); font-size: 0.75rem; }
+.plan-body { flex: 1 1 auto; min-width: 0; }
+.plan-name { font-weight: 600; font-size: 0.9rem; }
+.plan-steps, .plan-actual { color: var(--ink-2); font-size: 0.8rem; margin-top: 2px; }
+.plan-rationale { color: var(--muted); font-size: 0.78rem; margin-top: 4px; font-style: italic; }
+.bar-sick { fill: var(--muted); opacity: 0.5; }
+.band { fill: var(--bad); opacity: 0.08; }
+.band-label { fill: var(--muted); font-size: 8px; }
 .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 12px 6px; margin: 0; }
 .card figcaption { font-size: 0.85rem; font-weight: 600; margin: 0 0 4px 4px; }
@@ -366,7 +598,10 @@ th { color: var(--ink-2); border-bottom: 1px solid var(--grid); }
 ${raceTiles}
 ${vo2Tile}
 ${readinessTile}
+${rampTile}
 </div>
+${upcomingHtml ? `<h2>Kommende økter</h2>\n${upcomingHtml}` : ''}
+${adherenceHtml ? `<h2>Etterlevelse, siste ${ADHERENCE_DAYS} dager</h2>\n${adherenceHtml}` : ''}
 <div class="charts">
 ${barChart({ title: 'Ukentlig løpsvolum, siste 16 uker (km)', data: weekly })}
 ${lineChart({
@@ -374,8 +609,11 @@ ${lineChart({
     data: thresholdSeries, fmt: fmtPace, tickSteps: [5, 10, 15, 30, 60], timeAxis: true, invert: true
 })}
 ${PREDIKSJONER.map(prediksjonsGraf).join('\n')}
+${HR_SONER.map(pacePerSoneGraf).join('\n')}
+${pulsdriftGraf}
+${prCard}
 ${lineChart({ title: 'HRV natt, siste 60 dager (ms)', data: hrvSeries })}
-${lineChart({ title: 'Hvilepuls, siste 60 dager (slag/min)', data: rhrSeries })}
+${lineChart({ title: 'Hvilepuls, siste 60 dager (slag/min)', data: rhrSeries, bands: sykdomsBands })}
 ${barChart({ title: 'Søvn, siste 30 dager (timer)', data: sleepSeries })}
 ${lineChart({ title: 'Treningsklarhet, siste 30 dager (0–100)', data: readinessSeries })}
 </div>
