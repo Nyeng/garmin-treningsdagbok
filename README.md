@@ -1,5 +1,8 @@
 # Garmin-treningsdagbok
 
+> Idéen kommer fra **Sondre Wittek** ([@sonwit](https://github.com/sonwit)) —
+> takk for tipset. Dette repoet er min egen gjennomføring av den.
+
 Kobler Garmin Connect til ditt eget GitHub-repo: henter treningsdata ned,
 lagrer den som JSON du eier selv, og pusher strukturerte økter, styrkeprogram
 og løyper den andre veien — så de dukker opp på klokka.
