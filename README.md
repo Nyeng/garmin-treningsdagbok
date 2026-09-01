@@ -137,14 +137,14 @@ Legger du til et nytt skript som leser eller skriver data: **importer `DATA` fra
 ```bash
 gh repo create garmin-data --private
 cd ~/Digdir/Repos/garmin-data
-git remote add origin git@github.com:DIN-BRUKER/garmin-data.git
+git remote add origin git@github.com:Nyeng/garmin-data.git
 git push -u origin main
 ```
 
 Legg tokenene inn som repo-secrets **i data-repoet** (`GARMIN_OAUTH1_TOKEN` og
-`GARMIN_OAUTH2_TOKEN`, se under), og bytt ut `DIN-BRUKER` i `KODE_REPO` øverst i
-workflow-filene der. Er kode-repoet privat, trenger checkout-steget i tillegg en
-PAT med `repo`-scope som secret.
+`GARMIN_OAUTH2_TOKEN`, se under), og sett `KODE_REPO` øverst i workflow-filene
+der til `<din-bruker>/garmin-treningsdagbok`. Er kode-repoet privat, trenger
+checkout-steget i tillegg en PAT med `repo`-scope som secret.
 
 ### Hva ligger hvor
 
