@@ -1,73 +1,93 @@
 {
   "name": "Retur etter sykdom → 10 km",
-  "note": "Uke 1-2. Pendling man-ons (3 km hver vei, kupert) er volumstativet; kvalitetsøktene ligger torsdag og i helga der tiden finnes. Terskel før intervaller: den gir et tall på hvor formen faktisk er, uten å koste en uke hvis svaret er dårlig. Pulstakene er satt fra LTHR 181 — juster når terskelen oppdaterer seg.",
+  "note": "Pendlingen man-ons er rammen, ikke distansen: 3 km er minimum, og turene under er utvidet til noe som faktisk er en økt. Kupert terreng gjør at pulsen stiger av seg selv i bakkene — la den, styr på snittet. Uke 1 ~42 km, uke 2 ~57 km. Til sammenligning: U32 før sykdommen var 59 km, og U35 (to uker siden) var 45 km — så kroppen har sett dette volumet nylig. Pulstakene er satt fra LTHR 181.",
   "workouts": [
     {
       "date": "2026-09-02",
-      "name": "Pendling inn",
-      "rationale": "3 km kupert, rolig. Bakkene gjør at pulsen stiger av seg selv — la den, men ikke jag farten.",
+      "name": "Pendling inn 8 km",
+      "rationale": "Utvidet pendling. Rolig hele veien — dette er dagen før terskeløkta.",
       "steps": [
-        { "kind": "warmup", "minutes": 5, "hr": { "max": 145 } },
-        { "kind": "interval", "km": 2.2, "hr": { "min": 130, "max": 152 } },
-        { "kind": "cooldown", "minutes": 3 }
+        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 6, "hr": { "min": 130, "max": 152 } },
+        { "kind": "cooldown", "minutes": 5 }
       ]
     },
     {
       "date": "2026-09-03",
       "name": "Terskel 4 x 6 min",
-      "rationale": "Ukas svar-økt. Styr på PULS, ikke fart — poenget er å se hvilken fart som kommer ut på 172-178. Ligger den under 4:30/km, er du ikke tilbake ennå. Ligger den nær 4:10, er du nærmere enn hvilepulsen antyder.",
+      "rationale": "Ukas svar-økt. Styr på PULS, ikke fart — poenget er å se hvilken fart som kommer ut på 172-178. Under 4:30/km betyr at du ikke er tilbake ennå; nær 4:10 betyr at du er nærmere enn hvilepulsen antyder. Noter tallet.",
       "steps": [
         { "kind": "warmup", "minutes": 15, "hr": { "max": 145 } },
-        { "kind": "interval", "minutes": 6, "hr": { "min": 172, "max": 178 }, "repeat": 4, "note": "Jevnt. Ikke start for hardt." },
+        { "kind": "interval", "minutes": 6, "hr": { "min": 172, "max": 178 }, "repeat": 4, "note": "Jevnt. Ikke start for hardt — første drag skal føles for lett." },
         { "kind": "recovery", "minutes": 2 },
         { "kind": "cooldown", "minutes": 10 }
       ]
     },
     {
       "date": "2026-09-05",
-      "name": "Langtur 12 km",
-      "rationale": "Rolig hele veien. Dette er uka der volumet skal komme tilbake, ikke farten.",
+      "name": "Langtur 14 km",
+      "rationale": "Rolig hele veien. Denne uka skal volumet tilbake, ikke farten.",
       "steps": [
         { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
-        { "kind": "interval", "km": 10, "hr": { "min": 130, "max": 155 } },
+        { "kind": "interval", "km": 12, "hr": { "min": 130, "max": 155 } },
         { "kind": "cooldown", "minutes": 5 }
       ]
     },
     {
-      "date": "2026-09-07",
-      "name": "Pendling hjem",
-      "rationale": "3 km rolig. Mandagen er klesdagen — ingen kvalitet her.",
+      "date": "2026-09-06",
+      "name": "Rolig 6 km",
+      "rationale": "Kort og rolig dagen etter langturen. Hopp over den hvis beina er tunge — det er ikke denne økta som avgjør noe.",
       "steps": [
-        { "kind": "warmup", "minutes": 5, "hr": { "max": 145 } },
-        { "kind": "interval", "km": 2.2, "hr": { "min": 130, "max": 152 } },
-        { "kind": "cooldown", "minutes": 3 }
+        { "kind": "warmup", "minutes": 8, "hr": { "max": 140 } },
+        { "kind": "interval", "km": 4, "hr": { "min": 125, "max": 148 } },
+        { "kind": "cooldown", "minutes": 4 }
+      ]
+    },
+    {
+      "date": "2026-09-07",
+      "name": "Pendling hjem 9 km",
+      "rationale": "Utvidet vei hjem, rolig. Mandagen er klesdagen — du bærer inn uka, så ingen kvalitet her.",
+      "steps": [
+        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 7, "hr": { "min": 130, "max": 152 } },
+        { "kind": "cooldown", "minutes": 5 }
       ]
     },
     {
       "date": "2026-09-08",
-      "name": "Pendling inn — bakkedrag",
-      "rationale": "Kort og kupert er ideelt for korte bakkedrag: 6 x 40 sek hardt opp, rolig ned. Makstall og pulsresponsen i pausen er det som betyr noe — snittall på 40 sekunder er ubrukelige (se README, «Korte drag»).",
+      "name": "Pendling inn 5 km rolig",
+      "rationale": "Kort og lett inn — kvaliteten kommer på vei hjem i dag.",
       "steps": [
-        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
-        { "kind": "interval", "seconds": 40, "hr": { "min": 165, "max": 190 }, "repeat": 6, "note": "Hardt opp bakken — kraft, ikke frekvens." },
-        { "kind": "recovery", "seconds": 110, "note": "Rolig ned igjen." },
-        { "kind": "cooldown", "minutes": 8 }
+        { "kind": "warmup", "minutes": 8, "hr": { "max": 140 } },
+        { "kind": "interval", "km": 3, "hr": { "min": 125, "max": 148 } },
+        { "kind": "cooldown", "minutes": 4 }
+      ]
+    },
+    {
+      "date": "2026-09-08",
+      "name": "Pendling hjem 9 km m/ bakkedrag",
+      "rationale": "6 x 40 sek hardt opp, jogg ned. Kupert pendlerrute er ideelt for dette. Les MAKS-tallene og pulsresponsen i pausen — snittall på 40-sekunders drag er ubrukelige (se README, «Korte drag»).",
+      "steps": [
+        { "kind": "warmup", "minutes": 15, "hr": { "max": 148 } },
+        { "kind": "interval", "seconds": 40, "hr": { "min": 165, "max": 190 }, "repeat": 6, "note": "Hardt opp — kraft i frasparket, ikke høyere frekvens." },
+        { "kind": "recovery", "seconds": 110, "note": "Jogg rolig ned igjen." },
+        { "kind": "cooldown", "minutes": 12 }
       ]
     },
     {
       "date": "2026-09-09",
-      "name": "Pendling hjem",
-      "rationale": "3 km rolig etter gårsdagens bakkedrag.",
+      "name": "Pendling inn 6 km",
+      "rationale": "Rolig etter gårsdagens bakkedrag. Kjennes beina tunge, kutt til de 3 km-ene og gå resten.",
       "steps": [
-        { "kind": "warmup", "minutes": 5, "hr": { "max": 145 } },
-        { "kind": "interval", "km": 2.2, "hr": { "min": 125, "max": 148 } },
-        { "kind": "cooldown", "minutes": 3 }
+        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 4, "hr": { "min": 125, "max": 148 } },
+        { "kind": "cooldown", "minutes": 5 }
       ]
     },
     {
       "date": "2026-09-10",
       "name": "Terskel 3 x 10 min",
-      "rationale": "Lengre drag enn forrige uke, samme puls. Sammenlign farten med 3. september — det er den sammenligningen som forteller om du er tilbake.",
+      "rationale": "Lengre drag, samme puls som forrige uke. Sammenlign farten med 3. september — det er DEN sammenligningen som forteller om du er tilbake, ikke hvilepulsen.",
       "steps": [
         { "kind": "warmup", "minutes": 15, "hr": { "max": 145 } },
         { "kind": "interval", "minutes": 10, "hr": { "min": 172, "max": 178 }, "repeat": 3 },
@@ -78,7 +98,7 @@
     {
       "date": "2026-09-13",
       "name": "Langtur 14 km",
-      "rationale": "To km lenger enn forrige helg. Rolig.",
+      "rationale": "Samme som forrige helg, ikke lenger — uka har nok volum fra pendlingen. Rolig hele veien — siste time skal ikke være raskere enn den første.",
       "steps": [
         { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
         { "kind": "interval", "km": 12, "hr": { "min": 130, "max": 155 } },
