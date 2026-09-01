@@ -63,6 +63,11 @@ function showCountdown() {
     if (!cfg) return;
     console.log('\n--- Nedtelling ---');
     for (const race of cfg.races ?? []) {
+        // Dato er valgfri — et mål kan være en ambisjon uten løp bak seg ennå.
+        if (!race.date) {
+            console.log(`${race.name}: mål ${race.goal} (ingen dato satt)`);
+            continue;
+        }
         const left = Math.ceil((new Date(race.date) - Date.now()) / 86_400_000);
         console.log(`${race.name}: ${race.date} — ${left} dager (${Math.floor(left / 7)} uker) | mål: ${race.goal}`);
     }

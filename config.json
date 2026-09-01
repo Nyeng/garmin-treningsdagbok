@@ -1,12 +1,25 @@
 {
   "races": [
     {
-      "name": "Eksempelløp — halvmaraton",
-      "date": "2027-09-18",
-      "distance_km": 21.1,
-      "goal": "1:35 (4:30/km)",
-      "goal_seconds": 5700,
-      "note": "Bytt ut denne med dine egne løp. goal_seconds er måltiden i sekunder og er det stats.js og dashboardet regner mot; goal er bare teksten som vises. Har du ingen løp planlagt, sett races til en tom liste."
+      "name": "5 km",
+      "distance_km": 5,
+      "goal": "sub 17:00 (3:23/km)",
+      "goal_seconds": 1020,
+      "note": "Første delmål. Garmin predikerte 17:54 per 2026-09-01, altså 54 sekunder unna. Ingen dato satt — dette er en ambisjon, ikke et påmeldt løp."
+    },
+    {
+      "name": "10 km",
+      "distance_km": 10,
+      "goal": "sub 36:00 (3:36/km)",
+      "goal_seconds": 2160,
+      "note": "Andre delmål. Garmin predikerte 37:46 per 2026-09-01. Jeg har vært innenfor på tid, men løypa var ikke en rettferdig måling — så målet står til det er gjort på en målt løype."
+    },
+    {
+      "name": "Halvmaraton",
+      "distance_km": 21.0975,
+      "goal": "sub 1:20:00 (3:47/km)",
+      "goal_seconds": 4800,
+      "note": "Hovedmålet. Garmin predikerte 1:28:43 per 2026-09-01 — 8:43 unna, og det største spranget av de tre. Forutsetter at 5- og 10 km-farten sitter først."
     }
   ]
 }

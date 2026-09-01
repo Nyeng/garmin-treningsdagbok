@@ -106,9 +106,11 @@ const DISTANSER = {
     marathon: { navn: 'maraton', tittel: 'maratonprediksjon', km: 42.195, felt: 'pred_marathon_s', tickSteps: [60, 120, 300, 600] }
 };
 
-// Rekkefølgen her er rekkefølgen på dashboardet. Bytt fritt — f.eks. til
-// ['half', 'marathon'] hvis du bygger opp mot en langdistanse.
-const PREDIKSJONER = ['k5', 'k10', 'marathon'];
+// Rekkefølgen her er rekkefølgen på dashboardet, og lista speiler målene i
+// config.json: 5 og 10 km er delmålene, halvmaraton er hovedmålet. Maraton er
+// utelatt fordi det ikke er et mål — grafen ville vært et tall uten en linje å
+// måle det mot. Bytt fritt, alle fire ligger i history.json uansett.
+const PREDIKSJONER = ['k5', 'k10', 'half'];
 
 // Målet fra config.json kobles til distansen på ±15 %, så «21.1» og «21.0975»
 // treffer samme graf og en 10 km-milvariant ikke faller mellom to stoler.
@@ -252,13 +254,24 @@ const predByKm = [
 ];
 const predFor = (km) => (predByKm.find(([d]) => Math.abs(d - km) / km < 0.15) ?? [])[1];
 const raceTiles = (cfg.races ?? []).map((race) => {
-    const daysLeft = Math.ceil((new Date(race.date) - Date.now()) / 86_400_000);
+    // `date` er valgfri: et mål kan være en ambisjon uten løp bak seg ennå
+    // («sub 17 på 5 km»). Uten dato droppes nedtellingen, og flisa viser gapet
+    // til prediksjonen i stedet — som er det tallet som betyr noe uansett.
+    const daysLeft = race.date
+        ? Math.ceil((new Date(race.date) - Date.now()) / 86_400_000)
+        : null;
     const pred = predFor(race.distance_km);
     const gap = pred ? pred - race.goal_seconds : null;
+    const hoved = daysLeft != null
+        ? `${daysLeft} <span class="tile-unit">dager</span>`
+        : `${esc(race.goal)}`;
+    const under = daysLeft != null
+        ? `mål ${esc(race.goal)}`
+        : 'mål uten dato';
     return `<div class="tile">
   <div class="tile-label">${esc(race.name)}</div>
-  <div class="tile-value">${daysLeft} <span class="tile-unit">dager</span></div>
-  <div class="tile-sub">mål ${esc(race.goal)}${pred ? ` · Garmin-prediksjon ${fmtRaceTime(pred)} <span class="${gap > 0 ? 'behind' : 'ahead'}">(${gap > 0 ? '+' : '−'}${fmtRaceTime(Math.abs(gap))})</span>` : ''}</div>
+  <div class="tile-value">${hoved}</div>
+  <div class="tile-sub">${under}${pred ? ` · Garmin-prediksjon ${fmtRaceTime(pred)} <span class="${gap > 0 ? 'behind' : 'ahead'}">(${gap > 0 ? '+' : '−'}${fmtRaceTime(Math.abs(gap))})</span>` : ''}</div>
 </div>`;
 }).join('');
 

@@ -564,7 +564,7 @@ hører hjemme i det private repoet.
 `history.json` uansett — lista velger bare hva som tegnes:
 
 ```js
-const PREDIKSJONER = ['k5', 'k10', 'marathon'];   // bytt fritt: 'half' finnes også
+const PREDIKSJONER = ['k5', 'k10', 'half'];   // 'marathon' finnes også
 ```
 
 Målet fra `config.json` kobles til riktig graf på distanse (±15 %), så et løp
