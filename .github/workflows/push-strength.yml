@@ -1,0 +1,33 @@
+name: Push styrkeøktene til Garmin
+
+# Trigges når push-strength.js endres — da lastes styrkeøktene (A, B og
+# core-økta) opp til Garmin Connects øktbibliotek. Pushen er idempotent:
+# økter med samme navn slettes først, så en justering erstatter forgjengeren
+# i stedet for å lage duplikater i biblioteket.
+#
+# Øktene er ikke datofestet — de gjenbrukes uke etter uke, og startes fra
+# klokka under Styrketrening → Økter.
+on:
+  push:
+    paths:
+      - 'push-strength.js'
+      - 'lib/workout-builder.js'
+  workflow_dispatch: {}
+
+jobs:
+  push-strength:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Push styrkeøktene til Garmin Connect
+        env:
+          GARMIN_OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+          GARMIN_OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: node push-strength.js

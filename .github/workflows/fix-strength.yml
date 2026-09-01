@@ -1,0 +1,49 @@
+name: Rett styrkeøkt
+
+# Kjører fix-strength.js mot Garmin når strength-fix.json endres. Fila avgjør
+# selv om det blir alvor: uten "apply": true er kjøringen en tørrkjøring som
+# bare viser diffen i loggen. To brytere må stå riktig — filas apply-flagg og
+# fraværet av --dry-run — fordi dette skriver til ekte helsedata uten angreknapp.
+on:
+  push:
+    paths:
+      - 'strength-fix.json'
+      - 'fix-strength.js'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # trengs for å committe de ferske øvelsessettene tilbake til repoet
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Rett øktas øvelsessett
+        env:
+          GARMIN_OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+          GARMIN_OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: node fix-strength.js
+
+      # Verktøyet skriver de ferske settene til data/exercisesets/ etter en
+      # vellykket retting. De må committes, ellers ligger repoet med gamle tall
+      # til noen tilfeldigvis kjører en backfill — og for en økt utenfor
+      # synkevinduet skjer det aldri.
+      - name: Commit oppdaterte øvelsessett
+        run: |
+          if [ -n "$(git status --porcelain data/exercisesets)" ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add data/exercisesets
+            git commit -m 'Ferske øvelsessett etter retting i Garmin'
+            git push
+          else
+            echo 'Ingen endring i data/exercisesets.'
+          fi

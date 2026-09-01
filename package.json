@@ -1,0 +1,26 @@
+{
+  "name": "garmin-treningsdagbok",
+  "version": "1.0.0",
+  "description": "Henter treningsdata fra Garmin Connect, lagrer den som JSON i ditt eget repo, og pusher strukturerte økter, styrkeprogram og løyper tilbake til klokka.",
+  "scripts": {
+    "login": "node login.js",
+    "sync": "node sync.js",
+    "stats": "node stats.js",
+    "push-workout": "node push-workout.js",
+    "push-strength": "node push-strength.js",
+    "dashboard": "node build-dashboard.js",
+    "test": "node test-fit.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@garmin/fitsdk": "^21.212.0",
+    "fflate": "^0.8.3",
+    "garmin-connect": "^1.6.2"
+  }
+}

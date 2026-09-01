@@ -1,0 +1,8 @@
+{
+  "why": "Eksempel. Skriv hvorfor rettelsen finnes — den står igjen som dokumentasjon etterpå.",
+  "apply": false,
+  "expect": { "hr": 175 },
+  "hr": 168,
+  "pace": "4:30",
+  "stopAutoDetect": false
+}

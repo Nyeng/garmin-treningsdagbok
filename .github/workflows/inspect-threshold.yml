@@ -1,0 +1,31 @@
+name: Inspiser terskelinnstillinger
+
+# Kjører inspect-threshold.js mot Garmin og skriver resultatet i kjøreloggen.
+# Samme mønster som inspect-activity.yml: trigges når skriptet endres, fordi
+# Claude-tokenet i skyøkter ikke får trigge workflows manuelt (403 på
+# workflow_dispatch), men en commit får det til.
+#
+# Skriver ingenting — verken til repoet eller til Garmin.
+on:
+  push:
+    paths:
+      - 'inspect-threshold.js'
+  workflow_dispatch: {}
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Let etter terskelinnstillingene
+        env:
+          GARMIN_OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+          GARMIN_OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: node inspect-threshold.js

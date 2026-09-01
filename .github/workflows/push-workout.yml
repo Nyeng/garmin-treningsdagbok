@@ -1,0 +1,39 @@
+name: Push dagens økt til Garmin
+
+# Trigges automatisk når workout.json endres (uansett branch) — f.eks. av
+# den daglige sky-routinen som velger dagens økt, eller av en manuell endring.
+# (push-workout.js er med i tilfelle en kodefiks skal re-deploye dagens økt —
+# pushen er idempotent og utgåtte datoer pushes aldri, så det er trygt.)
+# Pusher økta til Garmin Connect med tokens fra repo-secrets, så din egen maskin
+# ikke trengs.
+on:
+  push:
+    paths:
+      - 'workout.json'
+      - 'push-workout.js'
+      - 'lib/workout-builder.js'
+  workflow_dispatch: {} # "Run workflow"-knapp i Actions-fanen for manuell test
+
+jobs:
+  push-workout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Vis økta som pushes (logg)
+        env:
+          GARMIN_OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+          GARMIN_OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: node push-workout.js --dry-run
+
+      - name: Push økta til Garmin Connect
+        env:
+          GARMIN_OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+          GARMIN_OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: node push-workout.js

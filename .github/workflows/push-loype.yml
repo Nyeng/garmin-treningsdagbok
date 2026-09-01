@@ -1,0 +1,36 @@
+name: Push løype til Garmin
+
+# Trigges når loype.json endres. Fila lages av finn-loype.js --lagre, som kan
+# kjøres hvor som helst (OSM og Kartverket er åpne API-er) — mens selve
+# opplastingen krever Garmin-tokens, som finnes lokalt på maskina di og som
+# repo-secrets her. Samme mønster som push-workout.yml.
+on:
+  push:
+    paths:
+      - 'loype.json'
+      - 'push-loype.js'
+  workflow_dispatch: {} # "Run workflow"-knapp i Actions-fanen for manuell test
+
+jobs:
+  push-loype:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Vis løypa som pushes (logg)
+        env:
+          GARMIN_OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+          GARMIN_OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: node push-loype.js --dry-run
+
+      - name: Push løypa til Garmin Connect
+        env:
+          GARMIN_OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+          GARMIN_OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: node push-loype.js

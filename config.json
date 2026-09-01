@@ -1,0 +1,12 @@
+{
+  "races": [
+    {
+      "name": "Eksempelløp — halvmaraton",
+      "date": "2027-09-18",
+      "distance_km": 21.1,
+      "goal": "1:35 (4:30/km)",
+      "goal_seconds": 5700,
+      "note": "Bytt ut denne med dine egne løp. goal_seconds er måltiden i sekunder og er det stats.js og dashboardet regner mot; goal er bare teksten som vises. Har du ingen løp planlagt, sett races til en tom liste."
+    }
+  ]
+}

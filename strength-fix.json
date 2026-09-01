@@ -1,0 +1,8 @@
+{
+  "activityId": 0,
+  "why": "Eksempel. Sett activityId til økta som skal rettes, og beskriv hvorfor.",
+  "apply": false,
+  "fixes": [
+    { "ex": "LATERAL_RAISE/DUMBBELL_LATERAL_RAISE", "set": 3, "kg": 4 }
+  ]
+}

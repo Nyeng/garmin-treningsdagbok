@@ -1,0 +1,34 @@
+name: Inspiser aktivitet
+
+# Kjører inspect-activity.js mot Garmin og skriver resultatet i kjøreloggen.
+# Trigges når skriptet endres — det er måten Claude kan stille spørsmål til
+# Garmin-API-et fra en skyøkt, siden tokenene bare finnes som repo-secrets.
+# Skriver ingenting tilbake til repoet.
+on:
+  push:
+    paths:
+      - 'inspect-activity.js'
+  workflow_dispatch:
+    inputs:
+      activity_id:
+        description: 'Aktivitets-id (tom = nyeste)'
+        required: false
+        default: ''
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Inspiser aktiviteten
+        env:
+          GARMIN_OAUTH1_TOKEN: ${{ secrets.GARMIN_OAUTH1_TOKEN }}
+          GARMIN_OAUTH2_TOKEN: ${{ secrets.GARMIN_OAUTH2_TOKEN }}
+        run: node inspect-activity.js ${{ inputs.activity_id }}

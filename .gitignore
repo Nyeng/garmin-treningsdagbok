@@ -1,0 +1,49 @@
+# Avhengigheter (installeres på nytt med `npm install` / `npm ci`)
+node_modules/
+proxy/node_modules/
+
+# OS
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# HELSEDATA — holdes utenfor git fordi dette repoet er OFFENTLIG.
+# ---------------------------------------------------------------------------
+# Hele data/ er ignorert. Den inneholder søvn, HRV, hvilepuls, vekt,
+# kroppsfett og GPS-spor for hver eneste tur — altså hvor du bor. Den ligger
+# lokalt på maskinen din og skal aldri pushes.
+#
+# Konsekvens: `sync.js` kjøres LOKALT, ikke i GitHub Actions. Det finnes
+# ingen sync-workflow lenger, nettopp fordi den ville forsøkt å committe
+# denne mappa. Se «Public repo» i README.
+#
+# Vil du ha sky-synk igjen, er mønsteret et separat PRIVAT repo for data/ —
+# ikke å fjerne linja under.
+data/
+
+# Dashboardet er bygget av data/ og inneholder de samme helsedataene i
+# grafform. Genereres på nytt med `node build-dashboard.js`.
+dashboard.html
+
+# Treningsdagbok / analyser skrevet av deg eller en AI-assistent. Fritekst om
+# egen helse og form — hører ikke hjemme i et offentlig repo.
+dagbok/
+
+# Ruter fra finn-loype.js/finn-bakke.js. Røper hvor du løper, altså som regel
+# hvor du bor.
+loype.json
+bakke.json
+
+# Garmin-tokens skal ALDRI committes — de ligger uansett utenfor denne mappa i
+# ~/.garmin-tokens, men holder igjen her i tilfelle noen kopierer dem hit ved
+# et uhell. Et token gir full SKRIVETILGANG til Garmin-kontoen.
+.garmin-tokens/
+*.token.json
+.env
+.env.*
+!.env.example
+
+# Lokale AI-assistent-innstillinger og cache — ikke del av prosjektet.
+# Unntak: .claude/skills/ er delte prosjekt-prosedyrer og SKAL committes,
+# ellers finnes de ikke i skyøkter.
+.claude/*
+!.claude/skills/

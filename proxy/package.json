@@ -1,0 +1,17 @@
+{
+  "name": "garmin-proxy",
+  "version": "1.0.0",
+  "description": "Read-only proxy mot Garmin Connect. Holder OAuth-tokenet så det ikke trenger å ligge i en Claude Code-skyøkt.",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "garmin-connect": "^1.6.2"
+  }
+}

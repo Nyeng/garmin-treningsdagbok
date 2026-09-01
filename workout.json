@@ -1,0 +1,12 @@
+{
+  "date": "2027-01-01",
+  "name": "Terskel 4 x 6 min",
+  "type": "running",
+  "rationale": "Eksempeløkt. Fritekst her sendes ikke til Garmin — den er til deg selv og til dagboka. Sett date til dagens dato for at økta faktisk skal pushes; utgåtte datoer pushes aldri.",
+  "steps": [
+    { "kind": "warmup",   "minutes": 15, "hr": { "max": 145 } },
+    { "kind": "interval", "minutes": 6,  "hr": { "max": 172 }, "repeat": 4 },
+    { "kind": "recovery", "minutes": 2 },
+    { "kind": "cooldown", "minutes": 10 }
+  ]
+}
