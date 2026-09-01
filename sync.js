@@ -263,13 +263,17 @@ if (daysArg) {
 }
 
 log(`Synker ${iso(start)} → ${iso(today)}`);
+// Si hvor det skrives. En synk legger igjen titalls MB, og det er verdt å se
+// med én gang om den havner i det private data-repoet eller i ./data her —
+// glemt GARMIN_DATA_DIR er ellers en feil som først merkes når dataene mangler.
+log(`Data → ${DATA}${DATA_ER_EKSTERN ? '' : '  (GARMIN_DATA_DIR er ikke satt)'}`);
 const gc = await connect();
 await syncActivities(gc, start, today);
 await syncDaily(gc, start, today);
 await syncStatus(gc);
 
 writeSummary(DATA);
-log('Kompakt destillat lagret i data/summary.json');
+log(`Kompakt destillat lagret i ${join(DATA, 'summary.json')}`);
 
 // oauth2-token kan ha blitt fornyet underveis — lagre på nytt
 gc.exportTokenToFile(TOKEN_DIR);
