@@ -1,0 +1,89 @@
+{
+  "name": "Retur etter sykdom → 10 km",
+  "note": "Uke 1-2. Pendling man-ons (3 km hver vei, kupert) er volumstativet; kvalitetsøktene ligger torsdag og i helga der tiden finnes. Terskel før intervaller: den gir et tall på hvor formen faktisk er, uten å koste en uke hvis svaret er dårlig. Pulstakene er satt fra LTHR 181 — juster når terskelen oppdaterer seg.",
+  "workouts": [
+    {
+      "date": "2026-09-02",
+      "name": "Pendling inn",
+      "rationale": "3 km kupert, rolig. Bakkene gjør at pulsen stiger av seg selv — la den, men ikke jag farten.",
+      "steps": [
+        { "kind": "warmup", "minutes": 5, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 2.2, "hr": { "min": 130, "max": 152 } },
+        { "kind": "cooldown", "minutes": 3 }
+      ]
+    },
+    {
+      "date": "2026-09-03",
+      "name": "Terskel 4 x 6 min",
+      "rationale": "Ukas svar-økt. Styr på PULS, ikke fart — poenget er å se hvilken fart som kommer ut på 172-178. Ligger den under 4:30/km, er du ikke tilbake ennå. Ligger den nær 4:10, er du nærmere enn hvilepulsen antyder.",
+      "steps": [
+        { "kind": "warmup", "minutes": 15, "hr": { "max": 145 } },
+        { "kind": "interval", "minutes": 6, "hr": { "min": 172, "max": 178 }, "repeat": 4, "note": "Jevnt. Ikke start for hardt." },
+        { "kind": "recovery", "minutes": 2 },
+        { "kind": "cooldown", "minutes": 10 }
+      ]
+    },
+    {
+      "date": "2026-09-05",
+      "name": "Langtur 12 km",
+      "rationale": "Rolig hele veien. Dette er uka der volumet skal komme tilbake, ikke farten.",
+      "steps": [
+        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 10, "hr": { "min": 130, "max": 155 } },
+        { "kind": "cooldown", "minutes": 5 }
+      ]
+    },
+    {
+      "date": "2026-09-07",
+      "name": "Pendling hjem",
+      "rationale": "3 km rolig. Mandagen er klesdagen — ingen kvalitet her.",
+      "steps": [
+        { "kind": "warmup", "minutes": 5, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 2.2, "hr": { "min": 130, "max": 152 } },
+        { "kind": "cooldown", "minutes": 3 }
+      ]
+    },
+    {
+      "date": "2026-09-08",
+      "name": "Pendling inn — bakkedrag",
+      "rationale": "Kort og kupert er ideelt for korte bakkedrag: 6 x 40 sek hardt opp, rolig ned. Makstall og pulsresponsen i pausen er det som betyr noe — snittall på 40 sekunder er ubrukelige (se README, «Korte drag»).",
+      "steps": [
+        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
+        { "kind": "interval", "seconds": 40, "hr": { "min": 165, "max": 190 }, "repeat": 6, "note": "Hardt opp bakken — kraft, ikke frekvens." },
+        { "kind": "recovery", "seconds": 110, "note": "Rolig ned igjen." },
+        { "kind": "cooldown", "minutes": 8 }
+      ]
+    },
+    {
+      "date": "2026-09-09",
+      "name": "Pendling hjem",
+      "rationale": "3 km rolig etter gårsdagens bakkedrag.",
+      "steps": [
+        { "kind": "warmup", "minutes": 5, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 2.2, "hr": { "min": 125, "max": 148 } },
+        { "kind": "cooldown", "minutes": 3 }
+      ]
+    },
+    {
+      "date": "2026-09-10",
+      "name": "Terskel 3 x 10 min",
+      "rationale": "Lengre drag enn forrige uke, samme puls. Sammenlign farten med 3. september — det er den sammenligningen som forteller om du er tilbake.",
+      "steps": [
+        { "kind": "warmup", "minutes": 15, "hr": { "max": 145 } },
+        { "kind": "interval", "minutes": 10, "hr": { "min": 172, "max": 178 }, "repeat": 3 },
+        { "kind": "recovery", "minutes": 3 },
+        { "kind": "cooldown", "minutes": 10 }
+      ]
+    },
+    {
+      "date": "2026-09-13",
+      "name": "Langtur 14 km",
+      "rationale": "To km lenger enn forrige helg. Rolig.",
+      "steps": [
+        { "kind": "warmup", "minutes": 10, "hr": { "max": 145 } },
+        { "kind": "interval", "km": 12, "hr": { "min": 130, "max": 155 } },
+        { "kind": "cooldown", "minutes": 5 }
+      ]
+    }
+  ]
+}

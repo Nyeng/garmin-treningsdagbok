@@ -57,94 +57,9 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connect } from './lib/garmin.js';
-import {
-    warmup, warmupTime, interval, intervalTime, recovery, recoveryTime,
-    rampTime, cooldown, cooldownTime, buildWorkout
-} from './lib/workout-builder.js';
+import { buildFromSpec, isoDateFromName } from './lib/workout-spec.js';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-
-const RAMP_SECONDS = 20;
-const RAMP_NOTE = 'Skru opp farten nå — beltet skal være i målfart når draget starter';
-
-function durationOf(step) {
-    return step.seconds ?? (step.minutes != null ? step.minutes * 60 : null);
-}
-
-/**
- * Setter inn et opptrappingssteg foran hvert drag ("treadmill": true i
- * workout.json). De 20 sekundene tas fra det rolige steget foran når det er
- * tidsstyrt og har nok å gi (så økta blir like lang), ellers legges de til.
- * Et enkelt drag kan reservere seg med "ramp": false.
- */
-function insertRamps(specSteps) {
-    const out = [];
-    for (const s of specSteps) {
-        if (s.step === 'interval' && s.ramp !== false) {
-            const prev = out[out.length - 1];
-            const prevSecs = prev ? durationOf(prev) : null;
-            if (prev && ['recovery', 'warmup'].includes(prev.step)
-                && prevSecs != null && prevSecs - RAMP_SECONDS >= 20) {
-                const { minutes, ...rest } = prev;
-                out[out.length - 1] = { ...rest, seconds: prevSecs - RAMP_SECONDS };
-            }
-            out.push({ step: 'ramp', seconds: RAMP_SECONDS, note: s.rampNote ?? RAMP_NOTE });
-        }
-        out.push(s);
-    }
-    return out;
-}
-
-function buildFromSpec(spec) {
-    for (const field of ['date', 'name', 'steps']) {
-        if (!spec[field]) throw new Error(`workout.json mangler feltet "${field}"`);
-    }
-    const specSteps = spec.treadmill ? insertRamps(spec.steps) : spec.steps;
-    const steps = specSteps.map((s, i) => {
-        // Et steg avsluttes enten på distanse ("km") eller varighet
-        // ("minutes"/"seconds"); varighet vinner hvis begge er satt.
-        const secs = durationOf(s);
-        if (secs == null && s.km == null && s.step !== 'ramp') {
-            throw new Error(`Steg ${i + 1} (${s.step}) mangler lengde — sett "km", "minutes" eller "seconds"`);
-        }
-        const target = s.pace ?? s.hr;
-        let step;
-        switch (s.step) {
-            case 'warmup':   step = secs != null ? warmupTime(secs) : warmup(s.km); break;
-            case 'cooldown': step = secs != null ? cooldownTime(secs) : cooldown(s.km); break;
-            case 'interval': step = secs != null ? intervalTime(secs, target) : interval(s.km, target); break;
-            case 'recovery': step = secs != null ? recoveryTime(secs) : recovery(s.km); break;
-            case 'ramp':     step = rampTime(secs ?? RAMP_SECONDS); break;
-            default: throw new Error(`Ukjent steg-type "${s.step}" (steg ${i + 1}) — gyldige: warmup, interval, recovery, ramp, cooldown`);
-        }
-        if (s.note) step.description = s.note;
-        return step;
-    });
-    return buildWorkout({
-        name: `${toDisplayDate(spec.date)} ${spec.name}`,
-        description: spec.description,
-        steps
-    });
-}
-
-// Datoer lagres som ISO ("2026-08-08") i workout.json — det er formatet som
-// sorterer og sammenlignes riktig — men vises som dag-måned-år i øktnavnet.
-function toDisplayDate(isoDate) {
-    const [y, m, d] = isoDate.split('-');
-    return `${d}-${m}-${y}`;
-}
-
-// Henter datoen ut av et øktnavn og gir den tilbake som ISO, så den kan
-// sammenlignes med andre datoer. Godtar både dagens format ("08-06-2026 ...")
-// og det gamle ISO-formatet ("2026-06-08 ..."), slik at økter som ble pushet
-// før formatendringen fortsatt ryddes bort i stedet for å bli liggende for
-// alltid. Formatene kan ikke forveksles: ingen ISO-dato matcher dd-mm-yyyy.
-function isoDateFromName(workoutName = '') {
-    const dmy = /^(\d{2})-(\d{2})-(\d{4}) /.exec(workoutName);
-    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
-    const iso = /^(\d{4}-\d{2}-\d{2}) /.exec(workoutName);
-    return iso ? iso[1] : null;
-}
 
 const spec = JSON.parse(readFileSync(join(ROOT, 'workout.json'), 'utf8'));
 const workout = buildFromSpec(spec);

@@ -49,6 +49,7 @@ private API-et som Garmin Connect-appen selv bruker, via
 | `sync.js` | henter aktiviteter, splits, søvn, HRV, hvilepuls, vekt, VO2max, prediksjoner → data-repoet |
 | `stats.js` | ukesstatistikk, restitusjon, nedtelling til løp, i terminalen |
 | `push-workout.js` | dagens økt fra `workout.json` → strukturert økt i Garmin Connect |
+| `push-plan.js` | hele planen fra `plan.json` → daterte økter i **treningskalenderen** |
 | `push-strength.js` | faste styrkeøkter → øktbiblioteket i Garmin |
 | `push-loype.js` | en rute → løype (course) i Garmin |
 | `finn-loype.js` / `finn-bakke.js` | finner flate teststrekk og jevne intervallbakker fra OSM + Kartverket (**Norge**) |
@@ -249,7 +250,8 @@ node push-workout.js --delete ID  # slett en økt
 
 Fullt skjema står øverst i `push-workout.js`. Kort:
 
-- **Steg-typer:** `warmup`, `interval`, `recovery`, `cooldown`.
+- **Steg-typer:** `warmup`, `interval`, `recovery`, `cooldown`, `ramp`. Nøkkelen
+  heter `kind` (`step` godtas også, for gamle filer).
 - **Hvert steg avsluttes** enten på distanse (`"km": 1.35`) eller tid
   (`"minutes": 5` / `"seconds": 30`).
 - **Fartsmål:** `"pace": { "fast": "4:55", "slow": "5:00" }`.
@@ -257,6 +259,9 @@ Fullt skjema står øverst i `push-workout.js`. Kort:
   (`"hr": { "max": 172 }`), settes gulvet automatisk 50 slag under taket — bruk
   den formen på terskeldrag, der poenget er et tak og ikke et gulv, så klokka
   ikke maser «for lav puls» mens du fortsatt er på vei opp.
+- **`"repeat": 4`** på et drag gir 4 × (draget + pausen rett etter). Pausen
+  trekkes inn i gjentakelsen fordi det er slik en økt leses: «4 x 6 min med 2
+  min pause» er fire runder. Er det ingen pause etter, gjentas draget alene.
 - **`"treadmill": true`** på toppnivå legger inn et 20-sekunders opptrappingssteg
   foran hvert drag, så klokka vibrerer når det er på tide å skru opp beltet.
   Sekundene tas fra det rolige steget foran når det er tidsstyrt og har nok å
@@ -271,6 +276,50 @@ eller legg den i treningskalenderen på riktig dato.
 **NB:** fartsmål på intervallsteg bruker et stykke av Garmins interne
 workout-API som ikke er offentlig dokumentert. Sjekk økta i Connect etter push
 første gang.
+
+---
+
+## Treningsplan (`plan.json` → kalenderen)
+
+`push-workout.js` legger én økt i øktbiblioteket, og så planlegger du den for
+hånd. For en plan over flere uker er det ~50 klikk i Connect — altså friksjonen
+som gjør at planen ikke blir brukt. `push-plan.js` planlegger dem i stedet:
+
+```bash
+node push-plan.js --dry-run    # vis hva som ville skjedd
+node push-plan.js              # push + legg i treningskalenderen
+node push-plan.js --list       # hva ligger i kalenderen de neste 3 månedene
+node push-plan.js --clear      # fjern planens økter fra kalenderen
+```
+
+```json
+{
+  "name": "Retur etter sykdom → 10 km",
+  "workouts": [
+    { "date": "2026-09-03", "name": "Terskel 4 x 6 min", "steps": [ … ] },
+    { "date": "2026-09-05", "name": "Langtur 12 km",     "steps": [ … ] }
+  ]
+}
+```
+
+Hver økt bruker **nøyaktig samme steg-skjema som `workout.json`** — begge går
+gjennom `lib/workout-spec.js`, så det finnes bare én oversettelse fra data til
+Garmin-økt.
+
+Endepunktet er `POST workout-service/schedule/<workoutId>` med
+`{"date":"YYYY-MM-DD"}`, verifisert 01.09.2026. Det er ikke offentlig
+dokumentert — samme risikoklasse som fartsmålene og terskelverdiene.
+
+**Idempotent, og det kommer gratis:** sletting av en økt fjerner også
+kalenderoppføringen. Skriptet sletter derfor alle økter med en dato som finnes i
+planen før det pusher, så en justert plan *erstatter* den forrige i stedet for å
+legge seg oppå. Faste styrkeøkter har ingen dato i navnet og røres aldri.
+
+Alle økter bygges før noe sendes: en plan med en feil i økt 7 av 12 skal ikke
+etterlate seks halvpushede økter i Garmin.
+
+**Fallgruve:** `calendar-service` er **0-indeksert på måned** — oktober er
+`month/9`. En 1-indeksert forespørsel gir en tom kalender, ikke en feil.
 
 ---
 
