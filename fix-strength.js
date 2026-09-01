@@ -44,6 +44,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { connect, endpoints } from './lib/garmin.js';
+import { DATA } from './lib/paths.js';
 
 const API = 'https://connectapi.garmin.com';
 
@@ -188,7 +189,7 @@ if (!sendt) {
 // over økter som allerede HAR fil. Verktøyet vet nøyaktig hvilken aktivitet det
 // endret, så det er her ansvaret hører hjemme.
 const ferske = await gc.get(...endpoints.exerciseSets(activityId));
-const filsti = join('data', 'exercisesets', `${activityId}.json`);
+const filsti = join(DATA, 'exercisesets', `${activityId}.json`);
 mkdirSync(dirname(filsti), { recursive: true });
 writeFileSync(filsti, `${JSON.stringify(ferske, null, 2)}\n`);
 console.log(`Ferske øvelsessett skrevet til ${filsti}.`);

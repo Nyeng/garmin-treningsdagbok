@@ -8,20 +8,16 @@ proxy/node_modules/
 # ---------------------------------------------------------------------------
 # HELSEDATA — holdes utenfor git fordi dette repoet er OFFENTLIG.
 # ---------------------------------------------------------------------------
-# Hele data/ er ignorert. Den inneholder søvn, HRV, hvilepuls, vekt,
-# kroppsfett og GPS-spor for hver eneste tur — altså hvor du bor. Den ligger
-# lokalt på maskinen din og skal aldri pushes.
+# Treningsdataene bor normalt i et separat PRIVAT repo, som miljøvariabelen
+# GARMIN_DATA_DIR peker på (se lib/paths.js og «Public repo» i README).
+# Linjene under er sikkerhetsnettet den dagen variabelen IKKE er satt: da
+# faller skriptene tilbake på ./data her, og da skal ingenting av det havne i
+# git. Dataene inneholder søvn, HRV, hvilepuls, vekt, kroppsfett og GPS-spor
+# for hver eneste tur — altså hvor du bor.
 #
-# Konsekvens: `sync.js` kjøres LOKALT, ikke i GitHub Actions. Det finnes
-# ingen sync-workflow lenger, nettopp fordi den ville forsøkt å committe
-# denne mappa. Se «Public repo» i README.
-#
-# Vil du ha sky-synk igjen, er mønsteret et separat PRIVAT repo for data/ —
-# ikke å fjerne linja under.
+# Fjern aldri disse linjene. Sync-workflowen som committer data ligger i det
+# private data-repoet, ikke her.
 data/
-
-# Dashboardet er bygget av data/ og inneholder de samme helsedataene i
-# grafform. Genereres på nytt med `node build-dashboard.js`.
 dashboard.html
 
 # Treningsdagbok / analyser skrevet av deg eller en AI-assistent. Fritekst om

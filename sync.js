@@ -15,14 +15,12 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { connect, getDisplayName, endpoints, TOKEN_DIR } from './lib/garmin.js';
 import { writeSummary } from './lib/summary.js';
 import { updateHistory } from './lib/history.js';
 import { developerFieldSummary } from './lib/fit.js';
+import { DATA, DATA_ER_EKSTERN } from './lib/paths.js';
 
-const ROOT = dirname(fileURLToPath(import.meta.url));
-const DATA = join(ROOT, 'data');
 const SPLITS = join(DATA, 'splits');
 const DEVFIELDS = join(DATA, 'devfields');
 const DAILY = join(DATA, 'daily');

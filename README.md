@@ -27,10 +27,10 @@ Koden er skrevet for å leses av en AI-assistent (Claude Code, Cursor,
 Copilot) like mye som av deg: dataene ligger som flate JSON-filer på disk, med
 et destillat i `data/summary.json` som er ment å være det en analyse leser.
 
-> **Dette repoet er offentlig — dataene er det ikke.** Koden deles fritt,
-> mens `data/`, `dashboard.html` og `dagbok/` er gitignorert og blir liggende
-> lokalt på maskinen din. Se [Public repo](#public-repo) rett under, og
-> [Personvern og sikkerhet](#personvern-og-sikkerhet) nederst.
+> **Dette repoet er offentlig — dataene er det ikke.** Koden deles fritt, mens
+> helsedataene ligger i et separat **privat** repo som `GARMIN_DATA_DIR` peker
+> på. Se [Public repo — og hvor dataene bor](#public-repo--og-hvor-dataene-bor)
+> rett under, og [Personvern og sikkerhet](#personvern-og-sikkerhet) nederst.
 
 ---
 
@@ -64,12 +64,12 @@ node stats.js
 
 ### Første oppsett av ditt eget repo
 
-1. Lag et repo på GitHub — offentlig eller privat, se [Public repo](#public-repo).
-2. Legg koden herfra inn i det (`git remote add origin <ditt-repo>`, eller
-   kopier filene inn i et nytt repo).
-3. Rediger `config.json` med løpene dine — se under.
-4. Kjør `node sync.js`. Dataene havner i `data/` lokalt og er gitignorert —
-   de skal ikke committes.
+1. Lag et **offentlig** repo for koden og et **privat** repo for dataene — se
+   [Public repo — og hvor dataene bor](#public-repo--og-hvor-dataene-bor).
+2. Legg koden herfra inn i det første (`git remote add origin <ditt-repo>`).
+3. `export GARMIN_DATA_DIR=~/Digdir/Repos/garmin-data` (legg den i `~/.zshrc`).
+4. Rediger `config.json` med løpene dine — se under.
+5. Kjør `node sync.js`. Dataene havner i data-repoet og committes der, aldri her.
 
 `config.json` er det eneste du *må* endre. Formatet:
 
@@ -94,62 +94,98 @@ regner mot; `goal` er bare teksten som vises. Har du ingen løp planlagt, la
 
 ---
 
-## Public repo
+## Public repo — og hvor dataene bor
 
-Repoet er satt opp for å **kunne være offentlig**: koden er generell, og alt
-som er personlig ligger utenfor git.
+Repoet er delt i to, med vilje:
 
-| Ignorert i `.gitignore` | Hvorfor |
-|---|---|
-| `data/` | søvn, HRV, hvilepuls, vekt, kroppsfett og GPS-spor for hver tur — altså hvor du bor |
-| `dashboard.html` | de samme dataene i grafform |
-| `dagbok/` | fritekstanalyser om egen helse og form |
-| `loype.json`, `bakke.json` | ruter fra `finn-loype.js`/`finn-bakke.js` — røper hvor du løper |
-| `~/.garmin-tokens` (utenfor repoet) | full **skrivetilgang** til Garmin-kontoen |
+| Repo | Innhold | Synlighet |
+|---|---|---|
+| `garmin-treningsdagbok` (dette) | koden, `config.json`, `workout.json` | **offentlig** |
+| `garmin-data` | `data/` — søvn, HRV, vekt, GPS-spor, dashboard | **privat** |
 
-Det som *er* personlig og likevel committes, er `config.json` (løpene og målene
-dine) og `workout.json` (dagens økt). Vurder selv om du vil dele dem — vil du
-ikke, legg dem i `.gitignore` og la `*.example`-varianter stå igjen.
+Grunnen er ikke datamengde — flate JSON-filer som skrives én gang er nettopp
+det git er best på, og et år lander på 50–100 MB. Grunnen er at `data/`
+inneholder hvor du sov, hvor tung du var og hvor du bor, og at det ikke hører
+hjemme i et offentlig repo.
 
-**Konsekvensen av at `data/` er ignorert:** synken kan ikke kjøre i GitHub
-Actions lenger, for den ville forsøkt å committe helsedata til et offentlig
-repo. `sync.js` kjøres derfor **lokalt**:
+Dataene trenger likevel et sted å bo som ikke er én disk. Særlig
+`data/history.json`: den er **append-only og kan ikke gjenskapes** — Garmin gir
+bare *siste* verdi for VO2max og prediksjoner, så formtrenden din finnes ingen
+andre steder. Derfor et privat repo og ikke en `.gitignore` alene.
+
+### `GARMIN_DATA_DIR`
+
+Alle skriptene henter datastien fra `lib/paths.js`, som leser miljøvariabelen
+`GARMIN_DATA_DIR`. Er den ikke satt, brukes `data/` i dette repoet (som er
+gitignorert) — så alt virker rett ut av boksen, og det private repoet er noe du
+kobler på når du vil.
 
 ```bash
+export GARMIN_DATA_DIR=~/Digdir/Repos/garmin-data   # legg den i ~/.zshrc
 node sync.js && node build-dashboard.js
 ```
 
-Vil du ha automatisk sky-synk tilbake, er mønsteret et **separat privat repo**
-for `data/` (som submodule eller egen klone) — ikke å fjerne `data/` fra
-`.gitignore`.
+`~` utvides av `lib/paths.js` selv, så den virker også når variabelen settes fra
+en workflow eller en `.env`.
 
-**Publiser aldri `dashboard.html` på GitHub Pages.** Pages er alltid offentlig
-på Free- og Pro-planen, uansett hva repoet er.
+Legger du til et nytt skript som leser eller skriver data: **importer `DATA` fra
+`lib/paths.js`**, ikke bygg stien på nytt. Ellers slutter den private varianten
+å virke i det stille.
 
-### Push-workflows og secrets
+### Sette opp det private data-repoet
 
-Workflowene som *skriver* til Garmin (`push-workout.yml`, `push-strength.yml`,
-`push-loype.yml`, `fix-*.yml`, `inspect-*.yml`) virker fint i et offentlig repo.
-De trigges på push til ditt eget repo eller manuelt, og GitHub eksponerer aldri
-repo-secrets til workflows som kjører fra en fork-PR.
+```bash
+gh repo create garmin-data --private
+cd ~/Digdir/Repos/garmin-data
+git remote add origin git@github.com:DIN-BRUKER/garmin-data.git
+git push -u origin main
+```
 
-Legg tokenene inn som repo-secrets (**Settings → Secrets and variables →
-Actions → New repository secret**):
+Legg tokenene inn som repo-secrets **i data-repoet** (`GARMIN_OAUTH1_TOKEN` og
+`GARMIN_OAUTH2_TOKEN`, se under), og bytt ut `DIN-BRUKER` i `KODE_REPO` øverst i
+workflow-filene der. Er kode-repoet privat, trenger checkout-steget i tillegg en
+PAT med `repo`-scope som secret.
 
-| Secret | Verdi |
-|---|---|
-| `GARMIN_OAUTH1_TOKEN` | innholdet i `~/.garmin-tokens/oauth1_token.json`, som én linje |
-| `GARMIN_OAUTH2_TOKEN` | innholdet i `~/.garmin-tokens/oauth2_token.json`, som én linje |
+### Hva ligger hvor
+
+**Kode-repoet** har workflowene som bare *skriver til Garmin* og ikke rører
+datamappa: `push-workout.yml`, `push-strength.yml`, `push-loype.yml`,
+`inspect-activity.yml`, `inspect-threshold.yml`.
+
+**Data-repoet** har `sync.yml` (henter data og committer dem), `fix-threshold.yml`
+og `fix-strength.yml`. De to siste ligger der fordi de skriver til datamappa —
+sikkerhetskopien av brukerprofilen og de rettede øvelsessettene — og fordi
+`threshold-fix.json` og `strength-fix.json` inneholder terskelpuls, aktivitets-ID-er
+og loggede vekter. Begge filene ligger derfor i data-repoet, og kjøres derfra:
+
+```bash
+cd ~/Digdir/Repos/garmin-data
+node ../garmin-treningsdagbok/fix-threshold.js --dry-run
+```
+
+Workflowene i begge repoene sjekker ut de to repoene ved siden av hverandre og
+kobler dem med `GARMIN_DATA_DIR`.
+
+### Secrets
+
+| Secret | Verdi | Hvor |
+|---|---|---|
+| `GARMIN_OAUTH1_TOKEN` | innholdet i `~/.garmin-tokens/oauth1_token.json`, som én linje | begge repo |
+| `GARMIN_OAUTH2_TOKEN` | innholdet i `~/.garmin-tokens/oauth2_token.json`, som én linje | begge repo |
 
 ```bash
 cat ~/.garmin-tokens/oauth1_token.json   # kopier ut, uten linjeskift på slutten
 ```
 
-Merk at OAuth1-tokenet utløper etter omtrent et år. Da må du kjøre `login.js`
-på nytt og oppdatere secretene.
+Secrets er trygge i et offentlig repo: GitHub gir dem aldri til workflows som
+kjører fra en fork-PR. Merk at OAuth1-tokenet utløper etter omtrent et år — da
+må `login.js` kjøres på nytt og secretene oppdateres begge steder.
 
-Hopper du over secretene, virker alt lokalt — workflowene er en bekvemmelighet,
+Hopper du over secretene, virker alt lokalt. Workflowene er en bekvemmelighet,
 ikke en forutsetning.
+
+**Publiser aldri `dashboard.html` på GitHub Pages.** Pages er alltid offentlig på
+Free- og Pro-planen, uansett hva repoet er.
 
 ---
 
@@ -482,13 +518,15 @@ for stilltiende midlet bort.
 ## Dashboard
 
 ```bash
-node build-dashboard.js     # → dashboard.html
+node build-dashboard.js     # → $GARMIN_DATA_DIR/dashboard.html
 ```
 
 Genereres fra `data/summary.json` + `config.json`: nedtelling og mål vs.
 Garmins prediksjon per løp, ukevolum, terskelfart og maratonprediksjon over
 tid, HRV, hvilepuls, søvn og treningsklarhet. Kjør den etter hver synk. Åpne
-fila lokalt i nettleseren — den er gitignorert og skal ikke committes.
+fila lokalt i nettleseren. Den skrives til **datamappa**, ikke hit: den er
+avledet av `summary.json` og inneholder de samme helsedataene i grafform, så den
+hører hjemme i det private repoet.
 
 De to formgrafene har **invertert y-akse** — de viser tider, så linja peker
 oppover når formen blir bedre. Punktene ligger etter dato, ikke jevnt fordelt:
@@ -516,10 +554,17 @@ data/
                          # bygges opp ett punkt per synk (lib/history.js)
   backup/                # sikkerhetskopi av brukerprofilen før hver skriving
   last_sync.txt          # dato for siste synk
-                         # (hele data/ er gitignorert — ligger bare lokalt)
-dashboard.html           # statisk dashboard, bygget av build-dashboard.js (gitignorert)
-config.json              # løpene dine og måltidene (committes)
-workout.json             # dagens økt som data (committes)
+  dashboard.html         # statisk dashboard, bygget av build-dashboard.js
+  threshold-fix.json     # rettelse av terskelverdier (se fix-threshold.js)
+  strength-fix.json      # rettelse av loggede styrkesett (se fix-strength.js)
+```
+
+Alt over ligger i det **private** data-repoet, som `GARMIN_DATA_DIR` peker på.
+I det offentlige kode-repoet ligger bare koden pluss:
+
+```
+config.json              # løpene dine og måltidene
+workout.json             # dagens økt som data
 ```
 
 `summary.json` er poenget med hele opplegget: rådataene fra Garmin er store og
@@ -701,12 +746,16 @@ noen ører for imaget i Artifact Registry.
 
 ## Personvern og sikkerhet
 
-- **Repoet er offentlig, dataene er ikke.** `data/`, `dashboard.html` og
-  `dagbok/` er gitignorert og ligger bare lokalt. `data/` inneholder søvn, HRV,
-  hvilepuls, vekt, kroppsfett og posisjonsdata for hver eneste tur — altså hvor
-  du bor. **Fjern aldri `data/` fra `.gitignore`**; se [Public repo](#public-repo).
-- **Sjekk før første push:** `git status --short` skal ikke vise noe fra `data/`,
-  og `git ls-files | grep -E '^data/|dashboard.html'` skal være tom.
+- **Kode-repoet er offentlig, data-repoet er privat.** Dataene inneholder søvn,
+  HRV, hvilepuls, vekt, kroppsfett og posisjonsdata for hver eneste tur — altså
+  hvor du bor. **Fjern aldri `data/` fra `.gitignore`** her, selv om
+  `GARMIN_DATA_DIR` peker et annet sted: linja er sikkerhetsnettet den dagen
+  variabelen ikke er satt.
+- **Sjekk før hver push til det offentlige repoet:**
+
+  ```bash
+  git ls-files | grep -E '^data/|dashboard\.html|dagbok/'   # skal være tom
+  ```
 - **Publiser aldri `dashboard.html` på GitHub Pages.** Pages er alltid offentlig
   på Free- og Pro-planen, uansett hva repoet er.
 - **Tokenene gir full tilgang til Garmin-kontoen**, også skriving. De ligger i

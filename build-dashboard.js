@@ -6,12 +6,12 @@
 // Free/Pro-plan (tilgangsstyring finnes kun på Enterprise), og dette er helsedata.
 // Åpne fila lokalt, eller be Claude vise den.
 
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
-const ROOT = dirname(fileURLToPath(import.meta.url));
-const summary = JSON.parse(readFileSync(join(ROOT, 'data', 'summary.json'), 'utf8'));
+import { ROOT, DATA } from './lib/paths.js';
+
+const summary = JSON.parse(readFileSync(join(DATA, 'summary.json'), 'utf8'));
 const cfg = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8'));
 
 // --- hjelpere ---------------------------------------------------------------
@@ -382,5 +382,11 @@ document.querySelectorAll('[data-tip]').forEach((el) => {
 </html>
 `;
 
-writeFileSync(join(ROOT, 'dashboard.html'), html);
-console.log('dashboard.html bygget');
+// Dashboardet skrives til datamappa, ikke repoet: det er avledet av
+// data/summary.json og inneholder de samme helsedataene i grafform. Ligger
+// det sammen med dataene, følger det automatisk med til det private
+// data-repoet og kan aldri havne i det offentlige kode-repoet ved et uhell.
+mkdirSync(DATA, { recursive: true });
+const utfil = join(DATA, 'dashboard.html');
+writeFileSync(utfil, html);
+console.log(`Dashboard bygget: ${utfil}`);

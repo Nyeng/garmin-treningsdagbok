@@ -51,6 +51,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { connect } from './lib/garmin.js';
+import { DATA } from './lib/paths.js';
 
 const API = 'https://connectapi.garmin.com';
 const SETTINGS = `${API}/userprofile-service/userprofile/user-settings`;
@@ -130,7 +131,7 @@ if (tørrkjør || !spec.apply) {
 
 // Sikkerhetskopi før skriving. Endepunktet erstatter hele profilen, og selv om
 // vi bare rører tre felter er det billig å kunne legge tilbake det som sto.
-const backup = join('data', 'backup', `user-settings-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+const backup = join(DATA, 'backup', `user-settings-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
 mkdirSync(dirname(backup), { recursive: true });
 writeFileSync(backup, JSON.stringify(nå, null, 2));
 console.log(`\nSikkerhetskopi av user-settings: ${backup}`);

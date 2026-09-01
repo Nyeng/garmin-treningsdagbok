@@ -7,11 +7,8 @@
 // løpsprediksjoner, terskelfart, restitusjonsdata og nedtelling til løpene.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const ROOT = dirname(fileURLToPath(import.meta.url));
-const DATA = join(ROOT, 'data');
+import { join } from 'node:path';
+import { ROOT, DATA } from './lib/paths.js';
 
 const RUN_TYPES = new Set(['running', 'track_running', 'trail_running', 'treadmill_running', 'street_running']);
 
