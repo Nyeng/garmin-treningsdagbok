@@ -58,6 +58,7 @@ function weekKey(dateStr) {
 // mellom Node (tegner knappene) og klientskriptet (filtrerer punktene) —
 // selve tallene lever bare her.
 const RANGES = [
+    { days: 1, label: 'Siste dag' },
     { days: 7, label: '7 dager' },
     { days: 30, label: '30 dager' },
     { days: 90, label: '3 måneder' },
