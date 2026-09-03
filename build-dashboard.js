@@ -374,21 +374,63 @@ const vo2Tile = st.vo2max ? `<div class="tile">
 // Ingen treningsklarhet-flis: klokka rapporterer feltet aldri (se merknad ved
 // seriesOf over) — flisa ville aldri vist noe uansett.
 
-// --- ramp rate: volumendring mot siste FULLFØRTE uke ------------------------
+// --- ramp rate: volumendring uke til dato ----------------------------------
 //
-// Sammenligner de to siste FULLFØRTE ukene, ikke inneværende uke — en uke som
-// bare er halvveis kjørt ville se ut som et voldsomt fall i volum og gitt et
-// falskt alarmerende tall. weekly[siste] er inneværende (mulig delvis) uke.
-const sisteFulle = weekly.at(-2);
-const foranDen = weekly.at(-3);
-const rampPct = sisteFulle && foranDen && foranDen.value > 0
-    ? ((sisteFulle.value - foranDen.value) / foranDen.value) * 100
+// Sammenligner inneværende uke mot SAMME ANTALL DAGER forrige uke. Forrige
+// variant viste siste fullførte uke, for å unngå at en halvkjørt uke så ut som
+// et volumfall. Det løste ett problem og lagde to: midt i uka fortalte flisa om
+// noe som var ferdig på søndag, og baselinen kunne være en sykdomsuke — 45.2 km
+// mot 7.8 km ga «+482 % · over 10 %-regelen», som er en artefakt og ikke et
+// signal om belastning.
+//
+// Torsdag mot torsdag er derimot sammenlignbart, og tallet oppdateres hver dag.
+const kmPerDato = new Map();
+for (const d of days) kmPerDato.set(d.date, (d.runs ?? []).reduce((sum, r) => sum + (r.km ?? 0), 0));
+
+const isoUkedag = (iso) => ((new Date(`${iso}T12:00:00`).getDay() + 6) % 7) + 1; // 1 = mandag
+const datoPluss = (iso, n) => {
+    const d = new Date(`${iso}T12:00:00`);
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+};
+const sumFraOgMed = (fraIso, antallDager) => {
+    let sum = 0;
+    for (let i = 0; i < antallDager; i++) sum += kmPerDato.get(datoPluss(fraIso, i)) ?? 0;
+    return sum;
+};
+
+const dagerInn = isoUkedag(today);
+const mandagDenneUka = datoPluss(today, -(dagerInn - 1));
+const mandagForrigeUke = datoPluss(mandagDenneUka, -7);
+
+const kmHittil = sumFraOgMed(mandagDenneUka, dagerInn);
+const kmSammePunktForrige = sumFraOgMed(mandagForrigeUke, dagerInn);
+const forrigeUkeTotal = sumFraOgMed(mandagForrigeUke, 7);
+
+const rampPct = kmSammePunktForrige > 0
+    ? ((kmHittil - kmSammePunktForrige) / kmSammePunktForrige) * 100
     : null;
-const rampTile = (sisteFulle && foranDen) ? `<div class="tile">
-  <div class="tile-label">Volumendring, siste fullførte uke</div>
+
+// 10 %-regelen gjelder progresjon fra et NORMALT utgangspunkt. Var forrige uke
+// en sykdomsuke, eller lå den langt under det vanlige, sier forholdstallet
+// ingenting om belastning — da undertrykkes advarselen og grunnen oppgis.
+const normaleUker = weekly.slice(-9, -1).map((w) => w.value).filter((v) => v > 0).sort((a, b) => a - b);
+const medianUke = normaleUker.length ? normaleUker[Math.floor(normaleUker.length / 2)] : 0;
+const baselineSyk = sickWeekKeys.has(weekKey(mandagForrigeUke));
+const baselineLav = medianUke > 0 && forrigeUkeTotal < medianUke * 0.5;
+const baselineUgyldig = baselineSyk || baselineLav;
+
+const rampAdvarsel = rampPct != null && rampPct > 10 && !baselineUgyldig
+    ? ' · <span class="behind">over 10 %-regelen</span>'
+    : baselineUgyldig
+        ? ` · <span class="tile-unit">${baselineSyk ? 'sykdomsuke' : 'unormalt lav uke'} som utgangspunkt — %-tallet sier lite</span>`
+        : '';
+
+const rampTile = `<div class="tile">
+  <div class="tile-label">Volumendring, uke til dato</div>
   <div class="tile-value">${rampPct == null ? '–' : `${rampPct > 0 ? '+' : ''}${rampPct.toFixed(0)}<span class="tile-unit">%</span>`}</div>
-  <div class="tile-sub">${sisteFulle.value.toFixed(1)} km vs ${foranDen.value.toFixed(1)} km uka før${rampPct != null && rampPct > 10 ? ' · <span class="behind">over 10 %-regelen</span>' : ''}</div>
-</div>` : '';
+  <div class="tile-sub">${kmHittil.toFixed(1)} km på ${dagerInn} av 7 dager · ${kmSammePunktForrige.toFixed(1)} km på samme tid forrige uke (${forrigeUkeTotal.toFixed(1)} km totalt)${rampAdvarsel}</div>
+</div>`;
 
 // --- personlige rekorder -----------------------------------------------------
 
