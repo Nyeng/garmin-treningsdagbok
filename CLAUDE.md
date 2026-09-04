@@ -20,6 +20,26 @@ hvilke dager brukeren ikke er hjemme.
 git ls-files | grep -E '^data/|dashboard\.html|dagbok/'   # skal være tom
 ```
 
+## Kjør ikke lokal synk og committ dataene
+
+`sync.js` lokalt er fint for å hente ferske tall til en analyse. Men **committ
+aldri de genererte filene derfra** — sync-workflowen eier dem, og kjører to
+ganger daglig. Gjør du begge deler, kolliderer `summary.json`, `status.json`,
+`activities/` og `dashboard.html` hver gang, og rebasen blir et rot.
+
+Skal du committe noe i data-repoet (f.eks. `plan.json` eller `CLAUDE.md`):
+
+```bash
+git pull --rebase                      # først, alltid
+git add <bare fila du endret>          # aldri git add -A
+```
+
+Har du allerede lokale endringer i genererte filer:
+
+```bash
+git checkout HEAD -- summary.json status.json dashboard.html activities/ history.json last_sync.txt
+```
+
 ## Datastien defineres ett sted
 
 `lib/paths.js`. Importer `DATA` derfra — bygg aldri `join(ROOT, 'data')` på
