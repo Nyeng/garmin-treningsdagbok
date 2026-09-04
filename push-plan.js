@@ -105,15 +105,23 @@ if (list) {
     process.exit(0);
 }
 
-// Datoene planen eier. Alt annet i biblioteket røres ikke — faste styrkeøkter
-// har ingen dato i navnet og er usynlige for denne ryddingen.
-const planDatoer = new Set(kommende.map((ø) => ø.date));
+// Planen eier hele SPENNET fra første til siste økt, ikke bare datoene den
+// tilfeldigvis har en økt på. Uten det blir en flyttet økt liggende igjen på
+// den gamle datoen: flytter du langturen fra lørdag til fredag, slutter planen
+// å eie lørdagen, og den gamle kopien overlever ryddingen som et spøkelse.
+//
+// Konsekvens å være klar over: en økt du har lagt inn FOR HÅND i kalenderen
+// innenfor planens spenn blir også ryddet bort. Legg den i plan.json i stedet.
+// Faste styrkeøkter har ingen dato i navnet og er usynlige for ryddingen.
+const spennFra = kommende[0].date;
+const spennTil = kommende[kommende.length - 1].date;
 
 let ryddet = 0;
 for (const w of await gc.getWorkouts(0, 100)) {
     const dato = isoDateFromName(w.workoutName);
     if (!dato) continue;
-    if (dato < today || planDatoer.has(dato)) {
+    const iSpennet = dato >= spennFra && dato <= spennTil;
+    if (dato < today || iSpennet) {
         await gc.deleteWorkout({ workoutId: w.workoutId });
         console.log(`  ryddet: ${w.workoutName}`);
         ryddet++;

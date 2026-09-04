@@ -34,7 +34,7 @@ import { exercise, perSide, rest, rounds, buildStrengthWorkout } from './lib/wor
 // programmer (oppbygging, vinterstyrke, vedlikehold), bytt denne ene linja —
 // endringen trigger .github/workflows/push-strength.yml, som rydder bort
 // forrige programs økter og laster opp det nye.
-const PROGRAM = 'eksempel';
+const PROGRAM = 'retur';
 
 export const UNDERKROPP = buildStrengthWorkout({
     name: 'Styrke A — underkropp',
@@ -97,7 +97,39 @@ export const OVERKROPP = buildStrengthWorkout({
     ]
 });
 
+export const RETUR = buildStrengthWorkout({
+    name: 'Styrke — retur, økt 1',
+    description:
+        'Første styrkeøkt. Løpsspesifikk og bevisst beskjeden: ensidig stabilitet, ' +
+        'legger/akilles og core — ingen tung vektstang. Målet er å tåle økt 2, ' +
+        'ikke å bli sliten i dag. Støl som ødelegger de neste løpeøktene er en ' +
+        'tapt uke, ikke en god start. 25–30 min.',
+    steps: [
+        rounds(3, [
+            perSide('CALF_RAISE', 'SINGLE_LEG_STANDING_CALF_RAISE', { reps: 12, note: 'Opp på to ben, 3 sek ned på ett' }),
+            rest(45)
+        ]),
+        rounds(3, [
+            perSide('SQUAT', 'DUMBBELL_STEP_UP', { reps: 8, note: 'Kroppsvekt først. Kasse i knehøyde, driv fra framre fot' }),
+            rest(60)
+        ]),
+        rounds(3, [
+            exercise('DEADLIFT', 'ROMANIAN_DEADLIFT', { reps: 10, note: 'Lett. Hoftehengsel, strak rygg — teknikk, ikke vekt' }),
+            rest(75)
+        ]),
+        rounds(3, [
+            perSide('CORE', 'CABLE_CORE_PRESS', { reps: 10, note: 'Pallof: press ut, motstå rotasjon' }),
+            rest(45)
+        ]),
+        rounds(3, [
+            exercise('PLANK', 'PLANK', { seconds: 45 }),
+            rest(45)
+        ])
+    ]
+});
+
 const PROGRAMMER = {
+    retur: [RETUR],
     eksempel: [UNDERKROPP, OVERKROPP]
 };
 
