@@ -508,10 +508,18 @@ function endOfIsoWeek(dateStr) {
     d.setDate(d.getDate() + (7 - dag));
     return d.toISOString().slice(0, 10);
 }
-const ukeDatoer = [];
-for (let d = new Date(`${startOfIsoWeek(today)}T12:00:00`); d.toISOString().slice(0, 10) <= endOfIsoWeek(today); d.setDate(d.getDate() + 1)) {
-    ukeDatoer.push(d.toISOString().slice(0, 10));
+function datesBetween(fraDato, tilDato) {
+    const datoer = [];
+    for (let d = new Date(`${fraDato}T12:00:00`); d.toISOString().slice(0, 10) <= tilDato; d.setDate(d.getDate() + 1)) {
+        datoer.push(d.toISOString().slice(0, 10));
+    }
+    return datoer;
 }
+const ukeDatoer = datesBetween(startOfIsoWeek(today), endOfIsoWeek(today));
+const nesteMandag = new Date(`${endOfIsoWeek(today)}T12:00:00`);
+nesteMandag.setDate(nesteMandag.getDate() + 1);
+const nesteUkeStart = nesteMandag.toISOString().slice(0, 10);
+const nesteUkeDatoer = datesBetween(nesteUkeStart, endOfIsoWeek(nesteUkeStart));
 
 // Kompakt drag-for-drag-oppsummering for en økt med gyldige splits — samme
 // fallgruve-filter som pulsdrift-grafen (ugyldige/for korte lap droppes).
@@ -527,7 +535,8 @@ function lapsSammendrag(run) {
     return laps.map((l, i) => `#${i + 1} ${fmtPace(l.duration / (l.distance / 1000))}/km @ ${Math.round(l.averageHR)}`).join(' · ');
 }
 
-const ukeRader = ukeDatoer.map((dato) => {
+function renderUkeRader(datoer) {
+    return datoer.map((dato) => {
     const planer = (plan?.workouts ?? []).filter((w) => w.date === dato);
     const faktiskeLøp = days.find((d) => d.date === dato)?.runs ?? [];
     const gjort = faktiskeLøp.length > 0;
@@ -561,9 +570,13 @@ const ukeRader = ukeDatoer.map((dato) => {
     ${w.rationale && !erFortid ? `<div class="plan-rationale">${esc(w.rationale)}</div>` : ''}
   </div>
 </div>`).join('\n');
-}).filter(Boolean);
+    }).filter(Boolean);
+}
 
+const ukeRader = renderUkeRader(ukeDatoer);
 const ukeHtml = ukeRader.length ? `<div class="plan">\n${ukeRader.join('\n')}\n</div>` : '';
+const nesteUkeRader = renderUkeRader(nesteUkeDatoer);
+const nesteUkeHtml = nesteUkeRader.length ? `<div class="plan">\n${nesteUkeRader.join('\n')}\n</div>` : '';
 
 // --- tabellvisning (tilgjengelighet + rask lesing) --------------------------
 
@@ -671,6 +684,7 @@ th { color: var(--ink-2); border-bottom: 1px solid var(--grid); }
 <h1>Løpedagbok</h1>
 <p class="updated">Data synket ${esc(st.synced_at ? fullTimestamp(st.synced_at) : '?')} UTC · dashboard bygget ${esc(fullTimestamp(new Date().toISOString()))} UTC</p>
 ${ukeHtml ? `<h2>Denne uka</h2>\n${ukeHtml}` : ''}
+${nesteUkeHtml ? `<h2>Neste uke</h2>\n${nesteUkeHtml}` : ''}
 <div class="tiles">
 ${vo2Tile}
 ${rampTile}
