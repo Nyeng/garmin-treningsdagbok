@@ -219,6 +219,23 @@ ikke en forutsetning.
 **Publiser aldri `dashboard.html` på GitHub Pages.** Pages er alltid offentlig på
 Free- og Pro-planen, uansett hva repoet er.
 
+### `vercel.json` — hvorfor den finnes
+
+Deployer du dashboardet til Vercel fra en workflow (se data-repoet), må Vercels
+**git-integrasjon være av**. Ellers bygger Vercel også fra dette repoets rot ved
+hver push — og roten har verken `index.html` eller `middleware.js`. Den deployen
+overtar produksjonsaliaset, og dashboardet svarer `404` til neste CLI-deploy.
+
+Det skjedde 17.09.2026: siden gikk ned to minutter etter hver push hit, mens
+selve CLI-deployen levde. `vercel.json` slår det av:
+
+```json
+{ "git": { "deploymentEnabled": false } }
+```
+
+Deployene styres da utelukkende av workflowen, som laster opp `dashboard.html`
+og `middleware.js` — og ingenting annet.
+
 ---
 
 ## Dagens økt → Garmin (`workout.json`)
