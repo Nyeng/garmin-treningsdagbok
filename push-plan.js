@@ -94,13 +94,20 @@ if (dryRun) {
 const gc = await connect();
 
 if (list) {
+    // Månedssvarene overlapper i endene: en dag sist i september kommer også
+    // med i oktober-svaret. Uten dedupe på kalender-id ser den ut som et
+    // duplikat i lista selv når det bare ligger én økt der.
     const nå = new Date();
+    const sett = new Map();
     for (let m = 0; m < 3; m++) {
         const d = new Date(Date.UTC(nå.getUTCFullYear(), nå.getUTCMonth() + m, 1));
         const cal = await gc.client.get(...endpoints.calendar(d.getUTCFullYear(), d.getUTCMonth()));
         for (const i of (cal?.calendarItems ?? []).filter((i) => i.itemType === 'workout' && i.date >= today)) {
-            console.log(`${i.date}  ${i.title}`);
+            sett.set(i.id, i);
         }
+    }
+    for (const i of [...sett.values()].sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))) {
+        console.log(`${i.date}  ${i.title}`);
     }
     process.exit(0);
 }
