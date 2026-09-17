@@ -40,6 +40,26 @@ Har du allerede lokale endringer i genererte filer:
 git checkout HEAD -- summary.json status.json dashboard.html activities/ history.json last_sync.txt
 ```
 
+## Vercel: git-deployer må være av
+
+`vercel.json` i roten har `git.deploymentEnabled: false`. **Ikke fjern den.**
+
+Vercel-prosjektet som serverer dashboardet er git-koblet til dette repoet.
+Uten flagget bygger Vercel fra repo-roten ved hver push — og roten har verken
+`index.html` eller `middleware.js`. Den deployen overtar produksjonsaliaset, og
+dashboardet svarer `404 «The page could not be found»` til neste CLI-deploy.
+
+Symptomet er lumsk: **deploy-URL-en lever (302 mot Vercel-SSO) mens domenet
+404-er**, og det skjer først to minutter etter pushen, altså når Vercel er
+ferdig med å bygge. 17.09.2026 gikk siden ned to ganger før årsaken ble funnet.
+
+Merk også at middleware-en er borte i det vinduet. Ingen helsedata lå eksponert
+— datafilene er i det private repoet — men beskyttelsen hvilte da på at det ikke
+fantes noe å servere, ikke på autentisering.
+
+Deployene skal utelukkende komme fra `sync.yml` i data-repoet, som laster opp
+`dashboard.html` og `middleware.js` og ingenting annet.
+
 ## Datastien defineres ett sted
 
 `lib/paths.js`. Importer `DATA` derfra — bygg aldri `join(ROOT, 'data')` på
