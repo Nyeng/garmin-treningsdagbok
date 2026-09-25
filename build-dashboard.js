@@ -167,7 +167,8 @@ const DISTANSER = {
 };
 
 // Rekkefølgen her er rekkefølgen på dashboardet, og lista speiler målene i
-// config.json: 5 og 10 km er delmålene, halvmaraton er hovedmålet. Maraton er
+// config.json: 10 km (Bislett 23.10) er hovedmålet, 5 km og halvmaraton er
+// ambisjoner uten dato. Maraton er
 // utelatt fordi det ikke er et mål — grafen ville vært et tall uten en linje å
 // måle det mot. Bytt fritt, alle fire ligger i history.json uansett.
 const PREDIKSJONER = ['k5', 'k10', 'half'];

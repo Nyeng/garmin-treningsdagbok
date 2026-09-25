@@ -1,26 +1,26 @@
 {
   "races": [
     {
-      "name": "5 km",
-      "distance_km": 5,
-      "goal": "sub 17:00 (3:23/km)",
-      "goal_seconds": 1020,
-      "note": "Første delmål. Garmin predikerte 17:54 per 2026-09-01, altså 54 sekunder unna. Ingen dato satt — dette er en ambisjon, ikke et påmeldt løp."
-    },
-    {
       "name": "10 km Pacing Bislett",
       "distance_km": 10,
       "goal": "sub 36:00 (3:36/km)",
       "goal_seconds": 2160,
-      "note": "Bislett stadion, fredag 23.10 — 25 runder på bane, flomlys og Wavelight-pacing. Het tidligere Kvalheimmila; navnebyttet er grunnen til at det ikke var å finne. Arrangør IK Tjalve. Sub 36 = 3:36/km = 86,4 sek per runde. PR 36:07 (25.04.2026).",
+      "note": "Hovedmålet. Bislett stadion, fredag 23.10 — 25 runder på bane, flomlys og Wavelight-pacing. Het tidligere Kvalheimmila; navnebyttet er grunnen til at det ikke var å finne. Arrangør IK Tjalve. Sub 36 = 3:36/km = 86,4 sek per runde. PR 36:07 (25.04.2026).",
       "date": "2026-10-23"
+    },
+    {
+      "name": "5 km",
+      "distance_km": 5,
+      "goal": "sub 17:00 (3:23/km)",
+      "goal_seconds": 1020,
+      "note": "Delmål. Garmin predikerte 17:54 per 2026-09-01, altså 54 sekunder unna. Ingen dato satt — dette er en ambisjon, ikke et påmeldt løp."
     },
     {
       "name": "Halvmaraton",
       "distance_km": 21.0975,
       "goal": "sub 1:20:00 (3:47/km)",
       "goal_seconds": 4800,
-      "note": "Hovedmålet. Garmin predikerte 1:28:43 per 2026-09-01 — 8:43 unna, og det største spranget av de tre. Forutsetter at 5- og 10 km-farten sitter først."
+      "note": "Langsiktig mål, ingen dato. Garmin predikerte 1:28:43 per 2026-09-01 — 8:43 unna, og det største spranget av de tre. Forutsetter at 5- og 10 km-farten sitter først."
     }
   ]
 }
