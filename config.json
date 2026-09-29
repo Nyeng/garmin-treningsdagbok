@@ -1,12 +1,12 @@
 {
   "races": [
     {
-      "name": "10 km Pacing Bislett",
+      "name": "10 km Jessheim Vintermaraton",
       "distance_km": 10,
-      "goal": "sub 36:00 (3:36/km)",
+      "goal": "pers under 36:15, sub 36:00 (3:36/km) hvis formen er der",
       "goal_seconds": 2160,
-      "note": "Hovedmålet. Bislett stadion, fredag 23.10 — 25 runder på bane, flomlys og Wavelight-pacing. Het tidligere Kvalheimmila; navnebyttet er grunnen til at det ikke var å finne. Arrangør IK Tjalve. Sub 36 = 3:36/km = 86,4 sek per runde. PR 36:07 (25.04.2026).",
-      "date": "2026-10-23"
+      "note": "Hovedmålet høsten 2026. Flat løype. PR 36:15 (Hytteplan 18.10.2025, offisiell tid). 10 km Pacing Bislett 23.10 løpes som formtest 16 dager før.",
+      "date": "2026-11-08"
     },
     {
       "name": "5 km",
